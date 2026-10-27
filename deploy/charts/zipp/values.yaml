@@ -1,13 +1,13 @@
 replicaCount: 1
 
 image:
-  repository: shawty
+  repository: zipp
   pullPolicy: Never
   tag: local
 
 migrations:
   enabled: false
-  envSecretName: shawty-env
+  envSecretName: zipp-env
   activeDeadlineSeconds: 240
   resources:
     requests:

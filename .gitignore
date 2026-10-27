@@ -10,6 +10,9 @@
 *.swp
 *~
 
+# Locally installed agent skills
+.agents/
+
 # Python environments, caches, and build outputs
 .venv/
 .pytest_cache/

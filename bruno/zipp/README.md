@@ -1,4 +1,4 @@
-# Shawty Bruno collection
+# Zipp Bruno collection
 
 Open this directory as a collection in Bruno. Select **Local 8080** when using
 `make port-forward-app` (the default port is 8080), or **Local 8000** for a

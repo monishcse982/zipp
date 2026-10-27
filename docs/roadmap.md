@@ -1,4 +1,4 @@
-# Shawty Project Status and Roadmap
+# Zipp Project Status and Roadmap
 
 ## Current status
 

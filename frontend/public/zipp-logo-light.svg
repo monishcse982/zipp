@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80">
+  <title id="title">Zipp</title>
+  <rect x="12" y="12" width="56" height="56" rx="13" fill="#1C604F"/>
+  <g transform="translate(8 8)">
+    <path d="M13 13h38v8L26 43h25v8H13v-8l25-22H13z" fill="#FFFFFF"/>
+    <path d="M37 55h14v5H37z" fill="#6EF3B4"/>
+  </g>
+  <text x="82" y="57" fill="#202A35" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="46" font-weight="600" letter-spacing="-3">zipp</text>
+  <circle cx="198" cy="53" r="4" fill="#287C68"/>
+</svg>

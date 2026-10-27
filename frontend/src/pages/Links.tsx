@@ -2,9 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api, ApiError, type CreateLink, type LinkList, type ManagedLink } from '../api'
-import { signIn, signOut } from '../auth'
+import { signIn } from '../auth'
 import { useAuth } from '../AuthContext'
-import { Badge, BrailleSpinner, Button, Input, Panel, StatusLine } from '../components/Ui'
+import { AppLayout, Badge, BrailleSpinner, Button, Input, Panel, StatusLine } from '../components/Ui'
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function isHttpUrl(value: string) {
@@ -14,15 +14,21 @@ export function isHttpUrl(value: string) {
 
 function LinkRow({ link }: { link: ManagedLink }) {
   const [copied, setCopied] = useState(false)
+  const [copyError, setCopyError] = useState(false)
   async function copy() {
+    setCopyError(false)
     try {
       await navigator.clipboard.writeText(link.shortened_url)
       setCopied(true)
       window.setTimeout(() => setCopied(false), 2000)
-    } catch { setCopied(false) }
+    } catch {
+      setCopied(false)
+      setCopyError(true)
+    }
   }
   return <article className={`link-row ${link.status !== 'active' ? 'link-inactive' : ''}`}>
-    <div className="link-primary"><Link to={`/links/${encodeURIComponent(link.short_code)}`} className="short-url">{link.shortened_url}</Link><Button kind="ghost" onClick={copy} aria-label={`Copy ${link.shortened_url}`}>{copied ? 'copied' : 'copy'}</Button></div>
+    <div className="link-primary"><div className="link-identity">{link.title && <span className="link-title">{link.title}</span>}<Link to={`/links/${encodeURIComponent(link.short_code)}`} className="short-url">{link.shortened_url}</Link></div><Button kind="ghost" onClick={copy} aria-label={`Copy ${link.shortened_url}`}>{copied ? 'Copied' : 'Copy link'}</Button></div>
+    {copyError && <p className="status-line status-error copy-error" role="alert">Copy failed. Select and copy the link address manually.</p>}
     <p className="destination" title={link.original_url}>{link.original_url}</p>
     <div className="link-meta"><time dateTime={link.created_at}>{new Date(link.created_at).toLocaleDateString()}</time><Badge status={link.status} /></div>
   </article>
@@ -74,27 +80,26 @@ export function Links() {
     create.mutate({ url, ttl_seconds: days * 86400, policy, ...(alias ? { short_code: alias } : {}), ...(title.trim() ? { title: title.trim() } : {}), ...(maxVisits ? { max_visits: visitLimit } : {}) })
   }
   const error = formError || (create.error instanceof Error ? create.error.message : null)
-  return <main className="content-page">
-    <header className="page-header"><div className="header-heading"><span className="brand-mark">zipp<span className="cursor">_</span></span><h1>links</h1></div><Button kind="ghost" onClick={() => void signOut()}>sign out</Button></header>
-    <Panel><form onSubmit={submit} className="create-form">
-      <Input id="long-url" label="long url" type="url" placeholder="https://" value={url} onChange={event => setUrl(event.target.value)} required />
-      <Button type="submit" disabled={create.isPending}>{create.isPending ? <BrailleSpinner /> : 'shorten >'}</Button>
-      <details className="advanced-fields"><summary>options</summary>
-        <Input id="title" label="title (optional)" value={title} onChange={event => setTitle(event.target.value)} maxLength={256} />
-        <Input id="alias" label="alias (optional)" value={alias} onChange={event => setAlias(event.target.value)} minLength={3} maxLength={32} />
-        <Input id="expiry" label="expires after (days)" type="number" min={1} max={30} value={days} onChange={event => setDays(Number(event.target.value))} />
-        <Input id="max-visits" label="maximum visits (optional)" type="number" min={1} step={1} value={maxVisits} onChange={event => setMaxVisits(event.target.value)} />
-        <label className="field" htmlFor="policy-type"><span>access</span><select id="policy-type" value={policyType} onChange={event => setPolicyType(event.target.value as CreateLink['policy']['type'])}><option value="public">public</option><option value="password_protected">password protected</option><option value="ip_restricted">IP restricted</option></select></label>
+  return <AppLayout title="Your links" description="Create, organize, and manage your short links.">
+    <Panel className="create-panel"><div className="panel-heading"><div><p className="eyebrow">NEW LINK</p><h2>Shorten a URL</h2></div><span className="panel-icon" aria-hidden="true">↘</span></div><form onSubmit={submit} className="create-form">
+      <Input id="long-url" label="Destination URL" type="url" placeholder="https://example.com/your-long-url" value={url} onChange={event => setUrl(event.target.value)} required />
+      <Button type="submit" disabled={create.isPending}>{create.isPending ? <BrailleSpinner /> : 'Create short link'}</Button>
+      <details className="advanced-fields"><summary>Advanced options</summary>
+        <Input id="title" label="Link title (optional)" value={title} onChange={event => setTitle(event.target.value)} maxLength={256} />
+        <Input id="alias" label="Custom alias (optional)" value={alias} onChange={event => setAlias(event.target.value)} minLength={3} maxLength={32} />
+        <Input id="expiry" label="Expires after (days)" type="number" min={1} max={30} value={days} onChange={event => setDays(Number(event.target.value))} />
+        <Input id="max-visits" label="Visit limit (optional)" type="number" min={1} step={1} value={maxVisits} onChange={event => setMaxVisits(event.target.value)} />
+        <label className="field" htmlFor="policy-type"><span>Access</span><select id="policy-type" value={policyType} onChange={event => setPolicyType(event.target.value as CreateLink['policy']['type'])}><option value="public">Public</option><option value="password_protected">Password protected</option><option value="ip_restricted">IP restricted</option></select></label>
         {policyType === 'password_protected' && <Input id="link-password" label="link password" type="password" value={password} onChange={event => setPassword(event.target.value)} minLength={1} maxLength={256} required autoComplete="new-password" />}
         {policyType === 'ip_restricted' && <label className="field" htmlFor="allowed-ips"><span>allowed IP addresses or CIDR ranges</span><textarea id="allowed-ips" value={ipList} onChange={event => setIpList(event.target.value)} placeholder={'203.0.113.4\n198.51.100.0/24'} rows={4} required /><small>Separate entries with commas or new lines. Visitors outside these ranges cannot open the link.</small></label>}
       </details>
       <StatusLine error={error} success={success} />
     </form></Panel>
-    <div className="section-heading">your links ({total})</div>
-    {list.isPending && <Panel><BrailleSpinner /> loading links</Panel>}
+    <section className="links-section" aria-labelledby="links-heading"><div className="section-heading"><div><p className="eyebrow">YOUR LINKS</p><h2 id="links-heading">All links <span className="count-pill">{total}</span></h2></div></div>
+    {list.isPending && <Panel><BrailleSpinner /> Loading links</Panel>}
     {list.error && <Panel><StatusLine error={list.error instanceof ApiError && list.error.status === 401 ? 'Session expired. Sign in again.' : list.error.message} />{list.error instanceof ApiError && list.error.status === 401 && <Button onClick={() => void signIn('/links')}>sign in</Button>}<Button kind="ghost" onClick={() => void list.refetch()}>retry</Button></Panel>}
-    {!list.isPending && !list.error && links.length === 0 && <Panel><p>No links yet. Create your first one above.</p></Panel>}
+    {!list.isPending && !list.error && links.length === 0 && <Panel className="empty-state"><span className="empty-icon" aria-hidden="true">↗</span><h3>No links yet</h3><p>Your short links will appear here. Create one above to get started.</p></Panel>}
     {links.length > 0 && <div className="link-list">{links.map(link => <LinkRow key={link.id} link={link} />)}</div>}
-    {list.hasNextPage && <Button kind="ghost" onClick={() => void list.fetchNextPage()} disabled={list.isFetchingNextPage}>{list.isFetchingNextPage ? <BrailleSpinner /> : 'load more'}</Button>}
-  </main>
+    {list.hasNextPage && <Button kind="ghost" onClick={() => void list.fetchNextPage()} disabled={list.isFetchingNextPage}>{list.isFetchingNextPage ? <BrailleSpinner /> : 'Load more links'}</Button>}</section>
+  </AppLayout>
 }

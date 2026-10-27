@@ -1,4 +1,4 @@
-# Shawty
+# Zipp
 
 A FastAPI URL shortener built as a small event-driven system. It creates short links, redirects visitors, publishes visit events to Kafka, and persists visit details asynchronously in PostgreSQL. The repository also includes local Kubernetes deployment, Prometheus/Grafana observability, and repeatable Locust load profiles.
 
@@ -25,13 +25,9 @@ A FastAPI URL shortener built as a small event-driven system. It creates short l
 
 ### User interface
 
-| Sign in | Manage links |
-| --- | --- |
-| <img src="docs/images/sign-in.png" alt="Zipp sign-in screen" width="520"> | <img src="docs/images/links.png" alt="Zipp link list and create form" width="520"> |
-
-| Link options | Link details |
-| --- | --- |
-| <img src="docs/images/link-options.png" alt="Optional link configuration fields" width="520"> | <img src="docs/images/link-details.png" alt="Link details and status" width="520"> |
+| Welcome screen | Cognito hosted sign-in | Link management | Link creation options |
+| --- | --- | --- | --- |
+| <img src="docs/images/sign-in.png" alt="Zipp welcome screen in dark mode with secure sign-in action and theme toggle" width="350"> | <img src="docs/images/cognito-sign-in.png" alt="Branded Amazon Cognito sign-in page in dark mode" width="350"> | <img src="docs/images/links.png" alt="Zipp link management page in dark mode" width="350"> | <img src="docs/images/link-options.png" alt="Zipp link creation form with advanced options in dark mode" width="350"> |
 
 ### Infrastructure
 
@@ -43,7 +39,7 @@ A FastAPI URL shortener built as a small event-driven system. It creates short l
 - Declaratively managed `link.visited` and `link.visited.dlq` topics.
 - Prometheus Operator, Prometheus, Grafana, kube-state-metrics, and node exporter.
 - Persistent Prometheus storage with two-day retention and a 4 GiB data cap.
-- Automatically provisioned Shawty Grafana dashboard.
+- Automatically provisioned Zipp Grafana dashboard.
 
 ### Tests
 
@@ -113,7 +109,7 @@ The Kafka consumer currently starts inside the FastAPI process during applicatio
 | `GET` | `/metrics` | Expose Prometheus metrics |
 | `GET` | `/docs` | OpenAPI documentation |
 
-A [Bruno collection](bruno/shawty/README.md) provides local
+A [Bruno collection](bruno/zipp/README.md) provides local
 environments and an ordered create, visit, and disable workflow for the API.
 
 Creating and managing links requires a Cognito user access token in the
@@ -184,16 +180,16 @@ APP_SCHEME=http
 APP_HOST=localhost
 APP_PORT=8080
 
-DATABASE_URL=postgresql+asyncpg://shawty_user:<postgres-password>@shawty-stack-postgresql:5432/shawty
-MIGRATION_DATABASE_URL=postgresql+asyncpg://shawty_user:<postgres-password>@shawty-stack-postgresql:5432/shawty
+DATABASE_URL=postgresql+asyncpg://zipp_user:<postgres-password>@zipp-stack-postgresql:5432/zipp
+MIGRATION_DATABASE_URL=postgresql+asyncpg://zipp_user:<postgres-password>@zipp-stack-postgresql:5432/zipp
 
-KAFKA_BOOTSTRAP_SERVERS=shawty-kafka-bootstrap:9092
+KAFKA_BOOTSTRAP_SERVERS=zipp-kafka-bootstrap:9092
 KAFKA_SECURITY_PROTOCOL=SASL_PLAINTEXT
 KAFKA_SASL_MECHANISM=SCRAM-SHA-512
-KAFKA_USERNAME=shawty-user
+KAFKA_USERNAME=zipp-user
 KAFKA_PASSWORD=generated-by-strimzi
-KAFKA_CLIENT_ID=shawty-api
-KAFKA_CONSUMER_GROUP_ID=shawty-visits
+KAFKA_CLIENT_ID=zipp-api
+KAFKA_CONSUMER_GROUP_ID=zipp-visits
 KAFKA_VISIT_TOPIC=link.visited
 KAFKA_VISIT_DLQ_TOPIC=link.visited.dlq
 
@@ -209,7 +205,7 @@ CORS_ORIGINS=http://localhost:5173
 
 Use a URL-safe PostgreSQL password or URL-encode it in both database URLs. The Makefile extracts this password to create the PostgreSQL Secret. Strimzi generates the real Kafka password, and `make infra-up` copies it into the application Secret before restarting the application.
 
-## Start Shawty with the UI
+## Start Zipp with the UI
 
 Set up `frontend/.env.local` from [frontend/.env.example](frontend/.env.example).
 Its API URL must be `http://localhost:8080`, and its Cognito issuer and client
@@ -253,8 +249,8 @@ make migration-status
 Useful direct checks:
 
 ```bash
-kubectl --context minikube get pods -n shawty
-kubectl --context minikube get kafka,kafkauser,kafkatopic -n shawty
+kubectl --context minikube get pods -n zipp
+kubectl --context minikube get kafka,kafkauser,kafkatopic -n zipp
 kubectl --context minikube get pods -n observability
 ```
 
@@ -300,8 +296,8 @@ make image-load
 make restart
 ```
 
-`image-load` starts Minikube if needed, builds `shawty:local` and
-`shawty-ui:local`, and loads both into the cluster. It does not restart the
+`image-load` starts Minikube if needed, builds `zipp:local` and
+`zipp-ui:local`, and loads both into the cluster. It does not restart the
 running Deployments by itself.
 
 ### Apply configuration or chart changes
@@ -360,7 +356,7 @@ make port-forward-all LOCAL_PORT=8080
 
 Available locally:
 
-- Shawty UI: <http://localhost:5173/> (with `make app-up` or `make port-forward-all`)
+- Zipp UI: <http://localhost:5173/> (with `make app-up` or `make port-forward-all`)
 - API: <http://localhost:8080>
 - OpenAPI: <http://localhost:8080/docs>
 - Metrics: <http://localhost:8080/metrics>
@@ -409,7 +405,7 @@ Forward Grafana in a dedicated terminal:
 make grafana-forward
 ```
 
-Open <http://localhost:3000> and select the **Shawty** dashboard.
+Open <http://localhost:3000> and select the **Zipp** dashboard.
 
 Forward Prometheus in another terminal:
 
@@ -420,7 +416,7 @@ make prometheus-forward
 Open <http://localhost:9090>. A useful target query is:
 
 ```promql
-up{namespace="shawty", service="shawty-stack"}
+up{namespace="zipp", service="zipp-stack"}
 ```
 
 The local profile defaults to four CPUs, 8 GiB of memory, and a 25 GiB disk.
@@ -442,7 +438,7 @@ transferred.
 The Helm release creates Strimzi `KafkaTopic` resources. The Strimzi Topic Operator then creates the broker topics automatically.
 
 ```bash
-kubectl --context minikube get kafkatopics -n shawty
+kubectl --context minikube get kafkatopics -n zipp
 ```
 
 Wait for both topics:
@@ -452,7 +448,7 @@ kubectl --context minikube wait \
   --for=condition=Ready \
   kafkatopic/link-visited \
   kafkatopic/link-visited-dlq \
-  -n shawty \
+  -n zipp \
   --timeout=60s
 ```
 

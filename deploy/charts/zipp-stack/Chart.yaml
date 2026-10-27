@@ -1,15 +1,15 @@
 apiVersion: v2
-name: shawty-stack
-description: Local Kubernetes stack for Shawty
+name: zipp-stack
+description: Local Kubernetes stack for Zipp
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
 
 dependencies:
-  - name: shawty
+  - name: zipp
     version: 0.1.0
-    repository: file://../shawty
-    condition: shawty.enabled
+    repository: file://../zipp
+    condition: zipp.enabled
   - name: postgresql
     version: 18.11.4
     repository: oci://registry-1.docker.io/bitnamicharts

@@ -3,11 +3,11 @@ SHELL := /bin/bash
 .NOTPARALLEL:
 
 PROFILE ?= minikube
-NAMESPACE ?= shawty
-RELEASE ?= shawty-stack
-IMAGE ?= shawty
+NAMESPACE ?= zipp
+RELEASE ?= zipp-stack
+IMAGE ?= zipp
 IMAGE_TAG ?= local
-FRONTEND_IMAGE ?= shawty-ui
+FRONTEND_IMAGE ?= zipp-ui
 FRONTEND_IMAGE_TAG ?= local
 ENV_FILE ?= .env.kubernetes
 LOCAL_PORT ?= $(or $(shell awk -F= '$$1 == "APP_PORT" { print $$2; exit }' $(ENV_FILE) 2>/dev/null),8000)
@@ -19,22 +19,22 @@ MINIKUBE_MEMORY ?= 8192
 MINIKUBE_DISK_SIZE ?= 25g
 MINIKUBE_DRIVER ?= docker
 
-APP_CHART := deploy/charts/shawty
-STACK_CHART := deploy/charts/shawty-stack
-RENDERED_MANIFEST := /tmp/shawty-stack-rendered.yaml
+APP_CHART := deploy/charts/zipp
+STACK_CHART := deploy/charts/zipp-stack
+RENDERED_MANIFEST := /tmp/zipp-stack-rendered.yaml
 KUBECTL := kubectl --context $(PROFILE)
 HELM_CONTEXT := --kube-context $(PROFILE)
-POSTGRES_SECRET := shawty-postgresql
+POSTGRES_SECRET := zipp-postgresql
 POSTGRES_STATEFULSET := $(RELEASE)-postgresql
 FRONTEND_SERVICE := $(RELEASE)-ui
-VALKEY_SECRET := shawty-valkey
+VALKEY_SECRET := zipp-valkey
 VALKEY_DEPLOYMENT := valkey
 STRIMZI_RELEASE := strimzi-operator
 STRIMZI_CHART := oci://quay.io/strimzi-helm/strimzi-kafka-operator
 STRIMZI_VERSION := 1.2.0
 STRIMZI_VALUES := deploy/kafka/strimzi-operator-values.yaml
-KAFKA_CLUSTER := shawty
-KAFKA_USER := shawty-user
+KAFKA_CLUSTER := zipp
+KAFKA_USER := zipp-user
 MONITORING_NAMESPACE ?= observability
 MONITORING_RELEASE ?= monitoring
 MONITORING_CHART := oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack
@@ -46,7 +46,7 @@ PROMETHEUS_SERVICE := $(MONITORING_RELEASE)-kube-prometheus-prometheus
 GRAFANA_PORT ?= 3000
 PROMETHEUS_PORT ?= 9090
 PORT_FORWARD_FRONTEND ?= 1
-HELM_IMAGE_ARGS = --set-string shawty.image.repository=$(IMAGE) --set-string shawty.image.tag=$(IMAGE_TAG) --set-string frontend.image.repository=$(FRONTEND_IMAGE) --set-string frontend.image.tag=$(FRONTEND_IMAGE_TAG)
+HELM_IMAGE_ARGS = --set-string zipp.image.repository=$(IMAGE) --set-string zipp.image.tag=$(IMAGE_TAG) --set-string frontend.image.repository=$(FRONTEND_IMAGE) --set-string frontend.image.tag=$(FRONTEND_IMAGE_TAG)
 
 .PHONY: help unit-test coverage app-up app-start frontend-deps frontend-env-check infra-up infra-start infra-stop infra-status cluster-up cluster-stop cluster-status image-build image-load validate-env namespace secret postgres-secret valkey-secret kafka-operator monitoring-install monitoring-status grafana-password postgres-password valkey-password kafka-password prometheus-password grafana-forward prometheus-forward chart-deps chart-validate deploy wait-infra sync-kafka-password infra-ready migration-status status logs port-forward port-forward-app port-forward-all diagnose-port-forward restart uninstall cluster-delete makemigrations migrate
 
@@ -112,7 +112,7 @@ namespace: cluster-up ## Create the application namespace when it does not exist
 	$(KUBECTL) create namespace $(NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 
 secret: namespace validate-env ## Create or update the application Secret from the env file.
-	$(KUBECTL) create secret generic shawty-env --namespace $(NAMESPACE) --from-env-file=$(ENV_FILE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
+	$(KUBECTL) create secret generic zipp-env --namespace $(NAMESPACE) --from-env-file=$(ENV_FILE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 
 postgres-secret: namespace validate-env ## Create PostgreSQL credentials from DATABASE_URL.
 	@database_url=$$(awk -F= '$$1 == "DATABASE_URL" { print substr($$0, index($$0, "=") + 1); exit }' "$(ENV_FILE)"); password=$$(printf '%s' "$$database_url" | sed -E 's#^[^:]+://[^:]+:([^@]+)@.*#\1#'); if [ -z "$$password" ] || [ "$$password" = "$$database_url" ]; then echo "Could not extract the PostgreSQL password from DATABASE_URL"; exit 1; fi; $(KUBECTL) create secret generic $(POSTGRES_SECRET) --namespace $(NAMESPACE) --from-literal=postgres-password="$$password" --from-literal=password="$$password" --dry-run=client -o yaml | $(KUBECTL) apply -f -
@@ -135,7 +135,7 @@ grafana-password: ## Print the local Grafana username and generated password.
 	@printf "Password: "; $(KUBECTL) get secret $(GRAFANA_SERVICE) --namespace $(MONITORING_NAMESPACE) -o jsonpath='{.data.admin-password}' | base64 --decode; printf '\n'
 
 postgres-password: ## Print the PostgreSQL application username and password.
-	@set -o pipefail; printf 'Username: shawty_user\nPassword: '; $(KUBECTL) get secret $(POSTGRES_SECRET) --namespace $(NAMESPACE) -o jsonpath='{.data.password}' | base64 --decode || exit $$?; printf '\n'
+	@set -o pipefail; printf 'Username: zipp_user\nPassword: '; $(KUBECTL) get secret $(POSTGRES_SECRET) --namespace $(NAMESPACE) -o jsonpath='{.data.password}' | base64 --decode || exit $$?; printf '\n'
 
 valkey-password: ## Print the Valkey password.
 	@set -o pipefail; printf 'Password: '; $(KUBECTL) get secret $(VALKEY_SECRET) --namespace $(NAMESPACE) -o jsonpath='{.data.default}' | base64 --decode || exit $$?; printf '\n'
@@ -162,10 +162,10 @@ chart-validate: ## Build locked dependencies, lint both charts, and render the c
 	helm dependency build $(STACK_CHART)
 	helm lint $(APP_CHART)
 	helm lint $(STACK_CHART)
-	helm template $(RELEASE) $(STACK_CHART) $(HELM_CONTEXT) --namespace $(NAMESPACE) $(HELM_IMAGE_ARGS) --set shawty.monitoring.serviceMonitor.interval=$(SCRAPE_INTERVAL) --set valkey.metrics.serviceMonitor.interval=$(SCRAPE_INTERVAL) > $(RENDERED_MANIFEST)
+	helm template $(RELEASE) $(STACK_CHART) $(HELM_CONTEXT) --namespace $(NAMESPACE) $(HELM_IMAGE_ARGS) --set zipp.monitoring.serviceMonitor.interval=$(SCRAPE_INTERVAL) --set valkey.metrics.serviceMonitor.interval=$(SCRAPE_INTERVAL) > $(RENDERED_MANIFEST)
 
 deploy: secret postgres-secret valkey-secret kafka-operator monitoring-install chart-validate ## Install or upgrade the umbrella Helm release.
-	helm upgrade --install $(RELEASE) $(STACK_CHART) $(HELM_CONTEXT) --namespace $(NAMESPACE) $(HELM_IMAGE_ARGS) --set shawty.monitoring.serviceMonitor.interval=$(SCRAPE_INTERVAL) --set valkey.metrics.serviceMonitor.interval=$(SCRAPE_INTERVAL) --timeout 5m
+	helm upgrade --install $(RELEASE) $(STACK_CHART) $(HELM_CONTEXT) --namespace $(NAMESPACE) $(HELM_IMAGE_ARGS) --set zipp.monitoring.serviceMonitor.interval=$(SCRAPE_INTERVAL) --set valkey.metrics.serviceMonitor.interval=$(SCRAPE_INTERVAL) --timeout 5m
 
 wait-infra: ## Wait for PostgreSQL, Kafka, topics, and the Kafka user.
 	$(KUBECTL) rollout status statefulset/$(POSTGRES_STATEFULSET) --namespace $(NAMESPACE) --timeout=10m
@@ -178,12 +178,12 @@ wait-infra: ## Wait for PostgreSQL, Kafka, topics, and the Kafka user.
 	$(KUBECTL) wait kafkatopic/link-visited-dlq --namespace $(NAMESPACE) --for=condition=Ready --timeout=5m
 
 sync-kafka-password: wait-infra ## Copy the generated Kafka password into the application Secret.
-	@password_b64=$$($(KUBECTL) get secret $(KAFKA_USER) --namespace $(NAMESPACE) -o jsonpath='{.data.password}'); if [ -z "$$password_b64" ]; then echo "Kafka password was not generated"; exit 1; fi; $(KUBECTL) patch secret shawty-env --namespace $(NAMESPACE) --type=merge -p '{"data":{"KAFKA_PASSWORD":"'"$$password_b64"'"}}' >/dev/null; echo "Kafka password synchronized to shawty-env"
+	@password_b64=$$($(KUBECTL) get secret $(KAFKA_USER) --namespace $(NAMESPACE) -o jsonpath='{.data.password}'); if [ -z "$$password_b64" ]; then echo "Kafka password was not generated"; exit 1; fi; $(KUBECTL) patch secret zipp-env --namespace $(NAMESPACE) --type=merge -p '{"data":{"KAFKA_PASSWORD":"'"$$password_b64"'"}}' >/dev/null; echo "Kafka password synchronized to zipp-env"
 
 infra-ready: deploy wait-infra sync-kafka-password restart ## Wait for dependencies, synchronize credentials, and restart the app.
 
 migration-status: ## Show migration versions recorded in the cluster database.
-	$(KUBECTL) exec --namespace $(NAMESPACE) statefulset/$(POSTGRES_STATEFULSET) -- sh -ec 'export PGPASSWORD="$$(cat /opt/bitnami/postgresql/secrets/password)"; psql -h 127.0.0.1 -U shawty_user -d shawty -c "SELECT app, name, applied_at FROM tortoise_migrations ORDER BY applied_at"'
+	$(KUBECTL) exec --namespace $(NAMESPACE) statefulset/$(POSTGRES_STATEFULSET) -- sh -ec 'export PGPASSWORD="$$(cat /opt/bitnami/postgresql/secrets/password)"; psql -h 127.0.0.1 -U zipp_user -d zipp -c "SELECT app, name, applied_at FROM tortoise_migrations ORDER BY applied_at"'
 
 status: ## Show the Helm release and application resources.
 	helm list $(HELM_CONTEXT) --namespace $(NAMESPACE)

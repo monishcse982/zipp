@@ -1,0 +1,12 @@
+{{- if .Values.monitoring.dashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "zipp.fullname" . }}-grafana-dashboard
+  labels:
+    grafana_dashboard: "1"
+    {{- include "zipp.labels" . | nindent 4 }}
+data:
+  zipp.json: |-
+{{ .Files.Get "dashboards/zipp.json" | indent 4 }}
+{{- end }}

@@ -3,9 +3,9 @@
 set -u
 
 context=${PORT_FORWARD_CONTEXT:-minikube}
-namespace=${PORT_FORWARD_NAMESPACE:-shawty}
+namespace=${PORT_FORWARD_NAMESPACE:-zipp}
 monitoring_namespace=${PORT_FORWARD_MONITORING_NAMESPACE:-observability}
-release=${PORT_FORWARD_RELEASE:-shawty-stack}
+release=${PORT_FORWARD_RELEASE:-zipp-stack}
 frontend_service=${PORT_FORWARD_FRONTEND_SERVICE:-${release}-ui}
 grafana_service=${PORT_FORWARD_GRAFANA_SERVICE:-monitoring-grafana}
 prometheus_service=${PORT_FORWARD_PROMETHEUS_SERVICE:-monitoring-kube-prometheus-prometheus}
@@ -61,7 +61,7 @@ start_forward() {
 echo "Starting Kubernetes port-forwards (context: $context)"
 start_forward "Application" "$namespace" "$release" "$app_port" 8000 1
 if [[ ${PORT_FORWARD_FRONTEND:-0} == 1 ]]; then
-  start_forward "Shawty UI" "$namespace" "$frontend_service" "$frontend_port" 8080 1
+  start_forward "Zipp UI" "$namespace" "$frontend_service" "$frontend_port" 8080 1
 fi
 if [[ ${PORT_FORWARD_CORE_ONLY:-0} != 1 ]]; then
   start_forward "PostgreSQL" "$namespace" "${release}-postgresql" "$postgres_port" 5432 0
@@ -79,7 +79,7 @@ if [[ ${PORT_FORWARD_CORE_ONLY:-0} != 1 ]]; then
   echo "Prometheus:  http://localhost:$prometheus_port"
 fi
 if [[ ${PORT_FORWARD_FRONTEND:-0} == 1 ]]; then
-  echo "Shawty UI:   http://localhost:$frontend_port"
+  echo "Zipp UI:   http://localhost:$frontend_port"
 fi
 echo "Press Ctrl+C to stop the local forwards."
 
