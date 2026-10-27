@@ -32,9 +32,9 @@ describe('create link', () => {
   it('rejects non-HTTP destinations before sending a request', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ items: [], total: 0 }), { status: 200 }))
     renderPage('/links', <Links />)
-    await screen.findByText('No links yet. Create your first one above.')
-    fireEvent.change(screen.getByLabelText('long url'), { target: { value: 'ftp://example.com' } })
-    fireEvent.click(screen.getByRole('button', { name: 'shorten >' }))
+    await screen.findByText('No links yet')
+    fireEvent.change(screen.getByLabelText('Destination URL'), { target: { value: 'ftp://example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create short link' }))
     expect(screen.getByRole('alert')).toHaveTextContent('http:// or https://')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })

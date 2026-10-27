@@ -1,16 +1,16 @@
-shawty:
+zipp:
   enabled: true
 
   replicaCount: 1
 
   image:
-    repository: shawty
+    repository: zipp
     pullPolicy: Never
     tag: local
 
   migrations:
     enabled: true
-    envSecretName: shawty-env
+    envSecretName: zipp-env
     activeDeadlineSeconds: 240
 
   service:
@@ -45,7 +45,7 @@ shawty:
 frontend:
   enabled: true
   image:
-    repository: shawty-ui
+    repository: zipp-ui
     tag: local
     pullPolicy: Never
   resources:
@@ -60,9 +60,9 @@ postgresql:
   enabled: true
 
   auth:
-    existingSecret: shawty-postgresql
-    username: shawty_user
-    database: shawty
+    existingSecret: zipp-postgresql
+    username: zipp_user
+    database: zipp
 
   primary:
     resources:
@@ -82,7 +82,7 @@ valkey:
 
   auth:
     enabled: true
-    usersExistingSecret: shawty-valkey
+    usersExistingSecret: zipp-valkey
     aclUsers:
       default:
         permissions: "~* &* +@all"
@@ -117,6 +117,6 @@ valkey:
 
 kafka:
   enabled: true
-  clusterName: shawty
-  userName: shawty-user
+  clusterName: zipp
+  userName: zipp-user
   storageSize: 2Gi

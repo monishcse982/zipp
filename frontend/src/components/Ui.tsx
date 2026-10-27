@@ -1,7 +1,27 @@
 import { forwardRef, useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
+import { Link, NavLink } from 'react-router-dom'
+import { signOut } from '../auth'
 
 export function DotGridBackground({ children }: { children: ReactNode }) {
   return <div className="app-shell">{children}</div>
+}
+
+export function WorkspaceLayout({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+  return <div className="workspace">
+    <a className="skip-link" href="#main-content">Skip to content</a>
+    <aside className="sidebar">
+      <Link className="brand-mark" to="/links" aria-label="Zipp home">zipp<span className="cursor">.</span></Link>
+      <div className="workspace-label">WORKSPACE</div>
+      <nav aria-label="Main navigation">
+        <NavLink to="/links" end className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}><span className="nav-icon" aria-hidden="true">↗</span> Links</NavLink>
+      </nav>
+      <div className="sidebar-bottom"><span className="avatar" aria-hidden="true">Z</span><div className="account-copy"><strong>Your workspace</strong><small>Personal account</small></div><button className="signout-button" onClick={() => void signOut()} aria-label="Sign out">↗</button></div>
+    </aside>
+    <div className="workspace-main">
+      <header className="workspace-header"><div><p className="eyebrow">LINK MANAGEMENT</p><h1>{title}</h1><p className="page-description">{description}</p></div><button className="mobile-signout" onClick={() => void signOut()}>Sign out</button></header>
+      <main id="main-content" className="workspace-content">{children}</main>
+    </div>
+  </div>
 }
 
 export function Panel({ children, className = '' }: { children: ReactNode; className?: string }) {

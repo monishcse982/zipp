@@ -88,10 +88,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Build application image
-        run: docker build --tag shawty:ci .
+        run: docker build --tag zipp:ci .
       - name: Build static UI image
         run: |
-          docker build --tag shawty-ui:ci \
+          docker build --tag zipp-ui:ci \
             --build-arg VITE_API_BASE_URL=http://localhost:8080 \
             --build-arg VITE_COGNITO_ISSUER=https://cognito-idp.example.com/example \
             --build-arg VITE_COGNITO_CLIENT_ID=ci-public-client \

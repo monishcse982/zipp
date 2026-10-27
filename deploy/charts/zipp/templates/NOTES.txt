@@ -1,4 +1,4 @@
-Shawty has been deployed.
+Zipp has been deployed.
 
 1. Check the application resources:
 
@@ -10,7 +10,7 @@ Shawty has been deployed.
 
   kubectl logs \
     --namespace {{ .Release.Namespace }} \
-    deployment/{{ include "shawty.fullname" . }} \
+    deployment/{{ include "zipp.fullname" . }} \
     --all-containers=true \
     --tail=200
 
@@ -18,7 +18,7 @@ Shawty has been deployed.
 
   kubectl port-forward \
     --namespace {{ .Release.Namespace }} \
-    service/{{ include "shawty.fullname" . }} \
+    service/{{ include "zipp.fullname" . }} \
     {{ .Values.service.port }}:{{ .Values.service.port }}
 
 4. In another terminal, verify the application:
