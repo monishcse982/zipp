@@ -7,6 +7,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <title>zipp_</title>
+    <script>
+      try {
+        const savedTheme = localStorage.getItem('zipp-theme');
+        const theme = savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#0b0f0e' : '#f5f7f9';
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

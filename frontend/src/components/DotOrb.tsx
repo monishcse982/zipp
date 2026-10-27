@@ -9,7 +9,7 @@ export default function DotOrb() {
     let visible = true
     let frame = 0
     let phase = 0
-    const accent = getComputedStyle(element).getPropertyValue('--color-accent').trim()
+    const accent = getComputedStyle(element).getPropertyValue('--accent').trim()
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const start = () => { if (!reduced && visible && !document.hidden && !frame) draw() }
     const stop = () => { if (frame) cancelAnimationFrame(frame); frame = 0 }

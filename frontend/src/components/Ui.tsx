@@ -1,6 +1,62 @@
-import { forwardRef, useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
+import { createContext, forwardRef, useContext, useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { signOut } from '../auth'
+
+type Theme = 'light' | 'dark'
+type ThemePreference = Theme | 'system'
+type ThemeContextValue = { theme: Theme; preference: ThemePreference; toggle: () => void; useSystem: () => void }
+const ThemeContext = createContext<ThemeContextValue>({ theme: 'light', preference: 'system', toggle: () => {}, useSystem: () => {} })
+
+function getThemePreference(): ThemePreference {
+  try {
+    const saved = window.localStorage.getItem('zipp-theme')
+    return saved === 'light' || saved === 'dark' ? saved : 'system'
+  } catch { return 'system' }
+}
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [preference, setPreference] = useState<ThemePreference>(getThemePreference)
+  const [systemTheme, setSystemTheme] = useState<Theme>(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+  const theme = preference === 'system' ? systemTheme : preference
+
+  useEffect(() => {
+    const query = window.matchMedia?.('(prefers-color-scheme: dark)')
+    if (!query) return
+    const onChange = (event: MediaQueryListEvent) => setSystemTheme(event.matches ? 'dark' : 'light')
+    query.addEventListener?.('change', onChange)
+    return () => query.removeEventListener?.('change', onChange)
+  }, [])
+
+  useEffect(() => {
+    const root = document.documentElement
+    root.dataset.theme = theme
+    root.style.colorScheme = theme
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0b0f0e' : '#f5f7f9')
+  }, [theme])
+
+  useEffect(() => {
+    try {
+      if (preference === 'system') window.localStorage.removeItem('zipp-theme')
+      else window.localStorage.setItem('zipp-theme', preference)
+    } catch { /* Theme preference remains available for this session. */ }
+  }, [preference])
+
+  const toggle = () => setPreference(theme === 'dark' ? 'light' : 'dark')
+  const useSystem = () => setPreference('system')
+  return <ThemeContext.Provider value={{ theme, preference, toggle, useSystem }}>{children}</ThemeContext.Provider>
+}
+
+export function ThemeToggle() {
+  const { theme, preference, toggle, useSystem } = useContext(ThemeContext)
+  const target = theme === 'dark' ? 'light' : 'dark'
+  return <div className="theme-controls">
+    <button className={`theme-toggle theme-${theme}`} type="button" aria-label={`Switch to ${target} mode`} aria-pressed={theme === 'dark'} title={preference === 'system' ? `Following browser preference: ${theme} mode` : `Using ${theme} mode`} onClick={toggle}>
+      <svg viewBox="0 0 24 24" aria-hidden="true">{theme === 'dark' ? <><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" /></> : <path d="M20.2 15.2A8.5 8.5 0 0 1 8.8 3.8 8.5 8.5 0 1 0 20.2 15.2Z" />}</svg>
+      <span>{theme === 'dark' ? 'Dark' : 'Light'}</span><span className="theme-switch" aria-hidden="true"><span /></span>
+    </button>
+    {preference !== 'system' && <button className="theme-auto" type="button" onClick={useSystem}>Use system</button>}
+  </div>
+}
 
 export function DotGridBackground({ children }: { children: ReactNode }) {
   return <div className="app-shell">{children}</div>
@@ -18,7 +74,7 @@ export function WorkspaceLayout({ title, description, children }: { title: strin
       <div className="sidebar-bottom"><span className="avatar" aria-hidden="true">Z</span><div className="account-copy"><strong>Your workspace</strong><small>Personal account</small></div><button className="signout-button" onClick={() => void signOut()} aria-label="Sign out">↗</button></div>
     </aside>
     <div className="workspace-main">
-      <header className="workspace-header"><div><p className="eyebrow">LINK MANAGEMENT</p><h1>{title}</h1><p className="page-description">{description}</p></div><button className="mobile-signout" onClick={() => void signOut()}>Sign out</button></header>
+      <header className="workspace-header"><div><p className="eyebrow">LINK MANAGEMENT</p><h1>{title}</h1><p className="page-description">{description}</p></div><div className="header-actions"><ThemeToggle /><button className="mobile-signout" onClick={() => void signOut()}>Sign out</button></div></header>
       <main id="main-content" className="workspace-content">{children}</main>
     </div>
   </div>
