@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { api, ApiError, type CreateLink, type LinkList, type ManagedLink } from '../api'
 import { signIn } from '../auth'
 import { useAuth } from '../AuthContext'
-import { Badge, BrailleSpinner, Button, Input, Panel, StatusLine, WorkspaceLayout } from '../components/Ui'
+import { AppLayout, Badge, BrailleSpinner, Button, Input, Panel, StatusLine } from '../components/Ui'
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function isHttpUrl(value: string) {
@@ -80,7 +80,7 @@ export function Links() {
     create.mutate({ url, ttl_seconds: days * 86400, policy, ...(alias ? { short_code: alias } : {}), ...(title.trim() ? { title: title.trim() } : {}), ...(maxVisits ? { max_visits: visitLimit } : {}) })
   }
   const error = formError || (create.error instanceof Error ? create.error.message : null)
-  return <WorkspaceLayout title="Your links" description="Create, organize, and manage your short links.">
+  return <AppLayout title="Your links" description="Create, organize, and manage your short links.">
     <Panel className="create-panel"><div className="panel-heading"><div><p className="eyebrow">NEW LINK</p><h2>Shorten a URL</h2></div><span className="panel-icon" aria-hidden="true">↘</span></div><form onSubmit={submit} className="create-form">
       <Input id="long-url" label="Destination URL" type="url" placeholder="https://example.com/your-long-url" value={url} onChange={event => setUrl(event.target.value)} required />
       <Button type="submit" disabled={create.isPending}>{create.isPending ? <BrailleSpinner /> : 'Create short link'}</Button>
@@ -95,11 +95,11 @@ export function Links() {
       </details>
       <StatusLine error={error} success={success} />
     </form></Panel>
-    <section className="links-section" aria-labelledby="links-heading"><div className="section-heading"><div><p className="eyebrow">YOUR WORKSPACE</p><h2 id="links-heading">All links <span className="count-pill">{total}</span></h2></div></div>
+    <section className="links-section" aria-labelledby="links-heading"><div className="section-heading"><div><p className="eyebrow">YOUR LINKS</p><h2 id="links-heading">All links <span className="count-pill">{total}</span></h2></div></div>
     {list.isPending && <Panel><BrailleSpinner /> Loading links</Panel>}
     {list.error && <Panel><StatusLine error={list.error instanceof ApiError && list.error.status === 401 ? 'Session expired. Sign in again.' : list.error.message} />{list.error instanceof ApiError && list.error.status === 401 && <Button onClick={() => void signIn('/links')}>sign in</Button>}<Button kind="ghost" onClick={() => void list.refetch()}>retry</Button></Panel>}
     {!list.isPending && !list.error && links.length === 0 && <Panel className="empty-state"><span className="empty-icon" aria-hidden="true">↗</span><h3>No links yet</h3><p>Your short links will appear here. Create one above to get started.</p></Panel>}
     {links.length > 0 && <div className="link-list">{links.map(link => <LinkRow key={link.id} link={link} />)}</div>}
     {list.hasNextPage && <Button kind="ghost" onClick={() => void list.fetchNextPage()} disabled={list.isFetchingNextPage}>{list.isFetchingNextPage ? <BrailleSpinner /> : 'Load more links'}</Button>}</section>
-  </WorkspaceLayout>
+  </AppLayout>
 }

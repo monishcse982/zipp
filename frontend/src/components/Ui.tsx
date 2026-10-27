@@ -1,5 +1,5 @@
 import { createContext, forwardRef, useContext, useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { signOut } from '../auth'
 
 type Theme = 'light' | 'dark'
@@ -62,21 +62,11 @@ export function DotGridBackground({ children }: { children: ReactNode }) {
   return <div className="app-shell">{children}</div>
 }
 
-export function WorkspaceLayout({ title, description, children }: { title: string; description: string; children: ReactNode }) {
-  return <div className="workspace">
+export function AppLayout({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+  return <div className="app-layout">
     <a className="skip-link" href="#main-content">Skip to content</a>
-    <aside className="sidebar">
-      <Link className="brand-mark" to="/links" aria-label="Zipp home">zipp<span className="cursor">.</span></Link>
-      <div className="workspace-label">WORKSPACE</div>
-      <nav aria-label="Main navigation">
-        <NavLink to="/links" end className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}><span className="nav-icon" aria-hidden="true">↗</span> Links</NavLink>
-      </nav>
-      <div className="sidebar-bottom"><span className="avatar" aria-hidden="true">Z</span><div className="account-copy"><strong>Your workspace</strong><small>Personal account</small></div><button className="signout-button" onClick={() => void signOut()} aria-label="Sign out">↗</button></div>
-    </aside>
-    <div className="workspace-main">
-      <header className="workspace-header"><div><p className="eyebrow">LINK MANAGEMENT</p><h1>{title}</h1><p className="page-description">{description}</p></div><div className="header-actions"><ThemeToggle /><button className="mobile-signout" onClick={() => void signOut()}>Sign out</button></div></header>
-      <main id="main-content" className="workspace-content">{children}</main>
-    </div>
+    <header className="app-header"><Link className="brand-mark" to="/links" aria-label="Zipp home">zipp<span className="cursor">.</span></Link><div className="header-actions"><ThemeToggle /><button className="header-signout" onClick={() => void signOut()}>Sign out</button></div></header>
+    <main id="main-content" className="app-main"><header className="page-heading"><h1>{title}</h1><p className="page-description">{description}</p></header><div className="app-content">{children}</div></main>
   </div>
 }
 
