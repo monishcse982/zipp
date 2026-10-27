@@ -25,9 +25,9 @@ A FastAPI URL shortener built as a small event-driven system. It creates short l
 
 ### User interface
 
-| Sign in | Manage links |
-| --- | --- |
-| <img src="docs/images/sign-in.png" alt="Zipp sign-in screen" width="520"> | <img src="docs/images/links.png" alt="Zipp link list and create form" width="520"> |
+| Zipp welcome screen | Cognito hosted sign-in | Link workspace |
+| --- | --- | --- |
+| <img src="docs/images/sign-in.png" alt="Zipp welcome screen with secure sign-in action" width="350"> | <img src="docs/images/cognito-sign-in.png" alt="Branded Amazon Cognito sign-in page" width="350"> | <img src="docs/images/links.png" alt="Zipp link dashboard with create form and links list" width="350"> |
 
 | Link options | Link details |
 | --- | --- |
