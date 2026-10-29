@@ -2,7 +2,7 @@
 
 ## Current status
 
-The planned application scope is complete. The project runs locally on Minikube and includes the API, management UI, Cognito authentication, visit-event processing, observability, and repeatable API load tests. EKS hosting is a separate learning exercise and is deferred; it is not a blocker for calling the current project complete.
+The planned application scope is complete. The project runs locally on Minikube and includes the API, management UI, Cognito authentication, visit-event processing, observability, and repeatable API load tests. The next infrastructure learning exercise is to recreate the stack on a single EC2-hosted K3s cluster and run scoped Chaos Mesh experiments. This is separate from the deferred EKS exercise and does not change the completed application scope.
 
 ## Completed capabilities
 
@@ -21,6 +21,7 @@ The planned application scope is complete. The project runs locally on Minikube 
 
 These are optional follow-up exercises, not unfinished project requirements:
 
+- Recreate the stack on a disposable EC2-hosted K3s cluster, install Chaos Mesh, and run bounded failure experiments. See [the EC2 and Chaos Mesh plan](ec2-chaos-mesh-plan.md).
 - Deploy the stack to EKS and use ECR images. See [the EKS learning plan](eks-learning-plan.md).
 - Add browser end-to-end tests for real UI journeys. Current frontend tests cover UI behavior with mocked authentication and API responses; API load testing is already covered by Locust.
 - Improve behavior when Redis is unavailable. Redis is currently checked during application startup and cache operations are not treated as best-effort.
@@ -29,4 +30,4 @@ These are optional follow-up exercises, not unfinished project requirements:
 
 ## Completion note
 
-The current local project scope is complete. No additional feature work is planned now. Reopen the deferred items only when they support a specific learning goal or deployment need.
+The current local project scope is complete. The EC2/K3s and Chaos Mesh work is a planned learning track; it is not required to finish or operate the local application. EKS and the other deferred items remain optional.

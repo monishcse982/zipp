@@ -32,7 +32,8 @@ A FastAPI URL shortener built as a small event-driven system. It creates short l
 ### Infrastructure
 
 - Local Kubernetes cluster through Minikube.
-- Helm application and umbrella charts.
+- Separate Helm charts for the app and its backing services.
+- Dedicated `zipp`, `zipp-infra`, and `zipp-observability` namespaces in one cluster.
 - PostgreSQL 18 with persistent storage and initialization SQL.
 - Single-node Kafka in KRaft mode managed by Strimzi.
 - SCRAM-SHA-512 Kafka authentication.
@@ -180,10 +181,10 @@ APP_SCHEME=http
 APP_HOST=localhost
 APP_PORT=8080
 
-DATABASE_URL=postgresql+asyncpg://zipp_user:<postgres-password>@zipp-stack-postgresql:5432/zipp
-MIGRATION_DATABASE_URL=postgresql+asyncpg://zipp_user:<postgres-password>@zipp-stack-postgresql:5432/zipp
+DATABASE_URL=postgresql+asyncpg://zipp_user:<postgres-password>@zipp-infra-postgresql.zipp-infra.svc.cluster.local:5432/zipp
+MIGRATION_DATABASE_URL=postgresql+asyncpg://zipp_user:<postgres-password>@zipp-infra-postgresql.zipp-infra.svc.cluster.local:5432/zipp
 
-KAFKA_BOOTSTRAP_SERVERS=zipp-kafka-bootstrap:9092
+KAFKA_BOOTSTRAP_SERVERS=zipp-kafka-bootstrap.zipp-infra.svc.cluster.local:9092
 KAFKA_SECURITY_PROTOCOL=SASL_PLAINTEXT
 KAFKA_SASL_MECHANISM=SCRAM-SHA-512
 KAFKA_USERNAME=zipp-user
@@ -193,7 +194,7 @@ KAFKA_CONSUMER_GROUP_ID=zipp-visits
 KAFKA_VISIT_TOPIC=link.visited
 KAFKA_VISIT_DLQ_TOPIC=link.visited.dlq
 
-CACHE_URL=redis://default:<valkey-password>@valkey:6379/0
+CACHE_URL=redis://default:<valkey-password>@valkey.zipp-infra.svc.cluster.local:6379/0
 CACHE_TTL=600
 
 LOG_LEVEL=INFO
@@ -203,7 +204,7 @@ COGNITO_CLIENT_ID=<public-spa-client-id>
 CORS_ORIGINS=http://localhost:5173
 ```
 
-Use a URL-safe PostgreSQL password or URL-encode it in both database URLs. The Makefile extracts this password to create the PostgreSQL Secret. Strimzi generates the real Kafka password, and `make infra-up` copies it into the application Secret before restarting the application.
+Use a URL-safe PostgreSQL password or URL-encode it in both database URLs. The Makefile extracts this password to create the PostgreSQL Secret. Strimzi generates the real Kafka password, and `make infra-up` copies it into the application Secret before restarting the application. This setup assumes a fresh Minikube cluster. Previous Kubernetes resources and database data are not migrated.
 
 ## Start Zipp with the UI
 
@@ -233,11 +234,18 @@ forwards. It skips image builds, image loading, Helm upgrades, and dependency
 installation. Use `make app-up` after changing code, images, secrets, or chart
 configuration so those changes are applied.
 
-For backend infrastructure only, run:
+To rebuild and deploy the app and its backing services, run:
 
 ```bash
 make infra-up
 ```
+
+The same Minikube cluster hosts all three namespaces. App workloads run in
+`zipp`; PostgreSQL, Valkey, Kafka, and Strimzi run in `zipp-infra`; Prometheus
+and Grafana remain in `zipp-observability`. The app uses namespace-qualified
+Kubernetes service names to reach its dependencies.
+
+This deployment is intended for a fresh cluster. It creates separate app, infrastructure, and observability Helm releases in `zipp`, `zipp-infra`, and `zipp-observability`. Starting over discards existing cluster data; use `make cluster-delete CONFIRM=delete` when you want to remove the Minikube cluster and its stored data.
 
 Check everything:
 
@@ -250,8 +258,8 @@ Useful direct checks:
 
 ```bash
 kubectl --context minikube get pods -n zipp
-kubectl --context minikube get kafka,kafkauser,kafkatopic -n zipp
-kubectl --context minikube get pods -n observability
+kubectl --context minikube get kafka,kafkauser,kafkatopic -n zipp-infra
+kubectl --context minikube get pods -n zipp-observability
 ```
 
 ## Makefile Workflow
@@ -315,7 +323,7 @@ If you changed values stored in Secrets, restart the application afterward so it
 make restart
 ```
 
-`make deploy` also refreshes the application, PostgreSQL, and Valkey Secrets from `$(ENV_FILE)`, installs or upgrades Strimzi and monitoring, validates the charts, and upgrades the application release. The application chart runs Tortoise migrations in a Helm Job after PostgreSQL is ready on first install and before application upgrades. The API's readiness endpoint stays unavailable until the migration is recorded. Helm waits for the migration Job; a failed migration fails the deployment. The PostgreSQL chart does not create application tables itself; Tortoise migration files are the schema source of truth. For standalone local development, `make migrate` applies migrations using `MIGRATION_DATABASE_URL` from the local `.env` (or the shell environment). Use `make migration-status` after deployment to list the versions recorded by Tortoise in the cluster database.
+`make deploy` installs or upgrades PostgreSQL, Valkey, and Kafka in `zipp-infra`, refreshes their credentials there, installs the local `zipp-observability` Helm chart in `zipp-observability`, then creates the application Secret in `zipp` and deploys the API and UI. It copies the Strimzi-generated Kafka password into the app Secret. The application chart runs Tortoise migrations in a Helm Job after PostgreSQL is ready and before the API starts. The API's readiness endpoint stays unavailable until the migration is recorded. Helm waits for the migration Job; a failed migration fails the deployment. The PostgreSQL chart does not create application tables itself; Tortoise migration files are the schema source of truth. For standalone local development, `make migrate` applies migrations using `MIGRATION_DATABASE_URL` from the local `.env` (or the shell environment). Use `make migration-status` after deployment to list the versions recorded by Tortoise in the cluster database.
 
 ### Inspect and troubleshoot
 
@@ -336,15 +344,15 @@ For a new or deleted cluster, use the full setup target. It builds and loads the
 make infra-up
 ```
 
-This is intentionally more involved than `make infra-start`; use it for initial provisioning, not every work session.
+This is intentionally more involved than `make infra-start`; use it for initial provisioning or to apply app and infrastructure changes, not every work session.
 
 The teardown targets have different effects:
 
 - `make infra-stop` stops Minikube and preserves the cluster for the next session.
-- `make uninstall` removes the application, monitoring, and Strimzi Helm releases but keeps the Minikube profile. Check the chart's persistent-volume behavior before relying on database data being retained.
+- `make uninstall` removes the app, infrastructure, monitoring, and Strimzi Helm releases but keeps the Minikube profile. Check the charts' persistent-volume behavior before relying on database data being retained.
 - `make cluster-delete CONFIRM=delete` deletes the Minikube profile and its cluster data.
 
-Run `make help` to list all targets. Common overrides include `PROFILE`, `NAMESPACE`, `ENV_FILE`, and `LOCAL_PORT`; for example, `make port-forward-app LOCAL_PORT=8080`.
+Run `make help` to list all targets. Common overrides include `PROFILE`, `NAMESPACE`, `INFRA_NAMESPACE`, `ENV_FILE`, and `LOCAL_PORT`; for example, `make port-forward-app LOCAL_PORT=8080`. If you change `INFRA_NAMESPACE` or `INFRA_RELEASE`, update the PostgreSQL, Kafka, and Valkey service names in `ENV_FILE` to match.
 
 ## Access the Application
 
@@ -416,7 +424,7 @@ make prometheus-forward
 Open <http://localhost:9090>. A useful target query is:
 
 ```promql
-up{namespace="zipp", service="zipp-stack"}
+up{namespace="zipp", service="zipp-app"}
 ```
 
 The local profile defaults to four CPUs, 8 GiB of memory, and a 25 GiB disk.
@@ -551,8 +559,8 @@ make help
 | `make infra-status` | Show cluster, application, and monitoring status |
 | `make image-build` | Build the local application image |
 | `make image-load` | Build and load the image into Minikube |
-| `make chart-validate` | Update dependencies, lint charts, and render manifests |
-| `make deploy` | Upgrade or install the application stack |
+| `make chart-validate` | Build dependencies, lint all charts, and render all releases |
+| `make deploy` | Upgrade or install infrastructure and app releases |
 | `make infra-ready` | Wait for dependencies, synchronize Kafka credentials, and restart the app |
 | `make migration-status` | List Tortoise migration versions recorded in cluster PostgreSQL |
 | `make restart` | Restart and wait for the API and UI Deployments |

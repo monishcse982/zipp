@@ -1,12 +1,9 @@
 dependencies:
-- name: zipp
-  repository: file://../zipp
-  version: 0.1.0
 - name: postgresql
   repository: oci://registry-1.docker.io/bitnamicharts
   version: 18.11.4
 - name: valkey
   repository: https://valkey.io/valkey-helm/
   version: 0.11.0
-digest: sha256:6547ca077bfd90b3c36951247019313e9542b237791cc692e7f0f0dd78696a85
-generated: "2026-10-27T22:05:31.040678+05:30"
+digest: sha256:568dc981ddacced9efa25b6136ea0626b70afc142519b1fff5daab1e329b06cd
+generated: "2026-10-29T21:18:28.125147+05:30"

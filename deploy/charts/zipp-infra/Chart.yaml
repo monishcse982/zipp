@@ -1,15 +1,11 @@
 apiVersion: v2
-name: zipp-stack
+name: zipp-infra
 description: Local Kubernetes stack for Zipp
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "0.1.0"
 
 dependencies:
-  - name: zipp
-    version: 0.1.0
-    repository: file://../zipp
-    condition: zipp.enabled
   - name: postgresql
     version: 18.11.4
     repository: oci://registry-1.docker.io/bitnamicharts

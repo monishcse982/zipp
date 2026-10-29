@@ -91,7 +91,7 @@ The project owner has confirmed the cluster setup is complete. Its Region, node 
 
 1. Install the Strimzi operator and wait for its CRDs/operator to be ready.
 2. Install Prometheus/Grafana with EKS storage values. Confirm Prometheus's PVC binds.
-3. Create the application namespace and Secrets, then install the umbrella chart.
+3. Create the `zipp`, `zipp-infra`, and `zipp-observability` namespaces. Deploy `zipp-infra` and Strimzi in `zipp-infra`, `zipp-observability` in `zipp-observability`, then `zipp-app` and the app Secret in `zipp`.
 4. Watch PostgreSQL, Kafka, Valkey, the migration Job, and the application pod. The migration Job must finish before treating the deployment as ready.
 5. Synchronize the generated Kafka user password into the application Secret using an EKS-safe workflow, then restart the application as required by the current design.
 6. Verify the API, a short-link redirect, a consumed visit event, and the provisioned Grafana dashboard. Read pod logs and Kubernetes events when any step fails.
@@ -127,7 +127,8 @@ Keep services internal at first. Use `kubectl port-forward` for the API and Graf
 | Proposed file | Purpose |
 | --- | --- |
 | `deploy/eks/cluster.yaml` | Explicit, disposable `eksctl` cluster configuration |
-| `deploy/eks/values-stack.yaml` | Both ECR images and EKS storage overrides for the umbrella chart |
+| `deploy/eks/values-app.yaml` | API and frontend ECR image settings for the app chart |
+| `deploy/eks/values-infra.yaml` | PostgreSQL, Valkey, and Kafka storage settings for the infrastructure chart |
 | `deploy/eks/values-monitoring.yaml` | EKS Prometheus storage overrides |
 | `.github/workflows/image.yml` | Optional OIDC-authenticated ECR build and push |
 | `scripts/eks-deploy.sh` or EKS Make targets | Manual, context-aware deployment sequence |

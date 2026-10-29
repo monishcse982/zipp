@@ -4,8 +4,10 @@ set -u
 
 context=${PORT_FORWARD_CONTEXT:-minikube}
 namespace=${PORT_FORWARD_NAMESPACE:-zipp}
-monitoring_namespace=${PORT_FORWARD_MONITORING_NAMESPACE:-observability}
-release=${PORT_FORWARD_RELEASE:-zipp-stack}
+infra_namespace=${PORT_FORWARD_INFRA_NAMESPACE:-zipp-infra}
+monitoring_namespace=${PORT_FORWARD_MONITORING_NAMESPACE:-zipp-observability}
+release=${PORT_FORWARD_RELEASE:-zipp-app}
+infra_release=${PORT_FORWARD_INFRA_RELEASE:-zipp-infra}
 frontend_service=${PORT_FORWARD_FRONTEND_SERVICE:-${release}-ui}
 grafana_service=${PORT_FORWARD_GRAFANA_SERVICE:-monitoring-grafana}
 prometheus_service=${PORT_FORWARD_PROMETHEUS_SERVICE:-monitoring-kube-prometheus-prometheus}
@@ -64,8 +66,8 @@ if [[ ${PORT_FORWARD_FRONTEND:-0} == 1 ]]; then
   start_forward "Zipp UI" "$namespace" "$frontend_service" "$frontend_port" 8080 1
 fi
 if [[ ${PORT_FORWARD_CORE_ONLY:-0} != 1 ]]; then
-  start_forward "PostgreSQL" "$namespace" "${release}-postgresql" "$postgres_port" 5432 0
-  start_forward "Valkey" "$namespace" valkey "$valkey_port" 6379 0
+  start_forward "PostgreSQL" "$infra_namespace" "${infra_release}-postgresql" "$postgres_port" 5432 0
+  start_forward "Valkey" "$infra_namespace" valkey "$valkey_port" 6379 0
   start_forward "Grafana" "$monitoring_namespace" "$grafana_service" "$grafana_port" 80 0
   start_forward "Prometheus" "$monitoring_namespace" "$prometheus_service" "$prometheus_port" 9090 0
 fi

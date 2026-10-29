@@ -1,0 +1,10 @@
+apiVersion: v2
+name: zipp-observability
+description: Prometheus, Grafana, and Zipp dashboards
+type: application
+version: 0.1.0
+appVersion: "91.4.1"
+dependencies:
+  - name: kube-prometheus-stack
+    version: 91.4.1
+    repository: oci://ghcr.io/prometheus-community/charts
