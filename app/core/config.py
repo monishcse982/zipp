@@ -3,67 +3,67 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-  log_level: str = "INFO"
-  log_format: str = "plain"
-  app_host: str = Field(default="localhost")
-  app_port: int = Field(default=8000)
-  app_scheme: str = Field(default="http")
-  database_url: str = Field(default="sqlite://:memory:")
-  migration_database_url: str = Field(default="sqlite://")
-  kafka_bootstrap_servers: str = "localhost:9092"
-  kafka_security_protocol: str = "SASL_PLAINTEXT"
-  kafka_sasl_mechanism: str = "PLAIN"
-  kafka_username: str = "zipp-user"
-  kafka_password: str = ""
-  kafka_client_id: str = "zipp-api"
-  kafka_consumer_group_id: str = "zipp-visits"
-  kafka_visit_topic: str = "link.visited"
-  kafka_visit_dlq_topic: str = "link.visited.dlq"
-  cache_url: str = "redis://redis:6379"
-  cache_ttl: int = 600
-  cognito_issuer: str = ""
-  cognito_client_id: str = ""
-  cognito_api_client_id: str = ""
-  cors_origins: str = "http://localhost:5173"
+    log_level: str = "INFO"
+    log_format: str = "plain"
+    app_host: str = Field(default="localhost")
+    app_port: int = Field(default=8000)
+    app_scheme: str = Field(default="http")
+    database_url: str = Field(default="sqlite://:memory:")
+    migration_database_url: str = Field(default="sqlite://")
+    kafka_bootstrap_servers: str = "localhost:9092"
+    kafka_security_protocol: str = "SASL_PLAINTEXT"
+    kafka_sasl_mechanism: str = "PLAIN"
+    kafka_username: str = "zipp-user"
+    kafka_password: str = ""
+    kafka_client_id: str = "zipp-api"
+    kafka_consumer_group_id: str = "zipp-visits"
+    kafka_visit_topic: str = "link.visited"
+    kafka_visit_dlq_topic: str = "link.visited.dlq"
+    cache_url: str = "redis://redis:6379"
+    cache_ttl: int = 600
+    cognito_issuer: str = ""
+    cognito_client_id: str = ""
+    cognito_api_client_id: str = ""
+    cors_origins: str = "http://localhost:5173"
 
-  model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-  @property
-  def base_url(self) -> str:
-    default_port = (self.app_scheme == "http" and self.app_port == 80) or (
-        self.app_scheme == "https" and self.app_port == 443
-    )
-    if default_port:
-      return f"{self.app_scheme}://{self.app_host}"
-    return f"{self.app_scheme}://{self.app_host}:{self.app_port}"
+    @property
+    def base_url(self) -> str:
+        default_port = (self.app_scheme == "http" and self.app_port == 80) or (
+            self.app_scheme == "https" and self.app_port == 443
+        )
+        if default_port:
+            return f"{self.app_scheme}://{self.app_host}"
+        return f"{self.app_scheme}://{self.app_host}:{self.app_port}"
 
-  @property
-  def allowed_cognito_client_ids(self) -> tuple[str, ...]:
-    return tuple(
-        client_id
-        for client_id in (self.cognito_client_id, self.cognito_api_client_id)
-        if client_id
-    )
+    @property
+    def allowed_cognito_client_ids(self) -> tuple[str, ...]:
+        return tuple(
+            client_id
+            for client_id in (self.cognito_client_id, self.cognito_api_client_id)
+            if client_id
+        )
 
 
 settings = Settings()
 
 
 def tortoise_database_url(database_url: str) -> str:
-  if database_url.startswith("postgresql+asyncpg://"):
-    return database_url.replace("postgresql+asyncpg://", "postgres://", 1)
-  return database_url
+    if database_url.startswith("postgresql+asyncpg://"):
+        return database_url.replace("postgresql+asyncpg://", "postgres://", 1)
+    return database_url
 
 
 TORTOISE_ORM = {
-  "connections": {"default": tortoise_database_url(settings.migration_database_url)},
-  "apps": {
-    "models": {
-      "models": ["app.db.models"],
-      "default_connection": "default",
-      "migrations": "app.migrations",
-    }
-  },
-  "use_tz": True,
-  "timezone": "UTC",
+    "connections": {"default": tortoise_database_url(settings.migration_database_url)},
+    "apps": {
+        "models": {
+            "models": ["app.db.models"],
+            "default_connection": "default",
+            "migrations": "app.migrations",
+        }
+    },
+    "use_tz": True,
+    "timezone": "UTC",
 }
