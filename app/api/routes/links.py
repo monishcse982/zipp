@@ -13,11 +13,11 @@ from app.db.repositories.links import LinksRepository
 from app.db.repositories.visits import VisitsRepository
 from app.kafka.producer import KafkaProducer, kafka_producer
 from app.schemas.links import (
-    LinkUpdateRequest,
-    ManagedLink,
-    ManagedLinkList,
-    ShortenRequest,
-    ShortenResponse,
+  LinkUpdateRequest,
+  ManagedLink,
+  ManagedLinkList,
+  ShortenRequest,
+  ShortenResponse,
 )
 from app.services.links import LinksService
 
@@ -26,19 +26,19 @@ logger = logging.getLogger(__name__)
 
 
 def get_links_repository() -> LinksRepository:
-    return LinksRepository()
+  return LinksRepository()
 
 
 def get_kafka_producer() -> KafkaProducer:
-    return kafka_producer
+  return kafka_producer
 
 
 def get_visits_repository() -> VisitsRepository:
-    return VisitsRepository()
+  return VisitsRepository()
 
 
 def get_cache(request: Request) -> Redis:
-    return request.app.state.cache
+  return request.app.state.cache
 
 
 def get_links_service(
@@ -46,7 +46,7 @@ def get_links_service(
     producer: KafkaProducer = Depends(get_kafka_producer),
     cache: Redis = Depends(get_cache),
 ) -> LinksService:
-    return LinksService(links_repository, producer, cache)
+  return LinksService(links_repository, producer, cache)
 
 
 @router.post("/link/", response_model=ShortenResponse)
@@ -55,8 +55,8 @@ async def shorten_url(
     links_service: LinksService = Depends(get_links_service),
     owner_sub: str = Depends(get_current_user),
 ) -> ShortenResponse:
-    logger.info("Shorten request received")
-    return await links_service.shorten_url(request, owner_sub)
+  logger.info("Shorten request received")
+  return await links_service.shorten_url(request, owner_sub)
 
 
 @router.get("/links", response_model=ManagedLinkList)
@@ -66,7 +66,7 @@ async def list_links(
     links_service: LinksService = Depends(get_links_service),
     owner_sub: str = Depends(get_current_user),
 ) -> ManagedLinkList:
-    return await links_service.list_managed_links(owner_sub, limit=limit, offset=offset)
+  return await links_service.list_managed_links(owner_sub, limit=limit, offset=offset)
 
 
 @router.get("/links/{short_code}", response_model=ManagedLink)
@@ -75,7 +75,7 @@ async def get_managed_link(
     links_service: LinksService = Depends(get_links_service),
     owner_sub: str = Depends(get_current_user),
 ) -> ManagedLink:
-    return await links_service.get_managed_link(short_code, owner_sub)
+  return await links_service.get_managed_link(short_code, owner_sub)
 
 
 @router.patch("/links/{short_code}", response_model=ManagedLink)
@@ -85,9 +85,9 @@ async def update_destination(
     links_service: LinksService = Depends(get_links_service),
     owner_sub: str = Depends(get_current_user),
 ) -> ManagedLink:
-    return await links_service.update_destination(
-        short_code, owner_sub, str(request.url)
-    )
+  return await links_service.update_destination(
+      short_code, owner_sub, str(request.url)
+  )
 
 
 @router.get("/link/{short_code}")
@@ -96,21 +96,21 @@ async def redirect_to_url(
     request: Request,
     links_service: LinksService = Depends(get_links_service),
 ) -> Response:
-    logger.info("Redirect request received short_code=%s", short_code)
-    try:
-        original_url = await links_service.get_url(
-            short_code,
-            password=request.headers.get("password"),
-            user_agent=request.headers.get("user-agent"),
-            referrer=request.headers.get("referer"),
-            ip_address=request.client.host if request.client else None,
-        )
-    except LinkPasswordRequiredError:
-        if "text/html" in request.headers.get("accept", ""):
-            return password_page(short_code)
-        raise
+  logger.info("Redirect request received short_code=%s", short_code)
+  try:
+    original_url = await links_service.get_url(
+        short_code,
+        password=request.headers.get("password"),
+        user_agent=request.headers.get("user-agent"),
+        referrer=request.headers.get("referer"),
+        ip_address=request.client.host if request.client else None,
+    )
+  except LinkPasswordRequiredError:
+    if "text/html" in request.headers.get("accept", ""):
+      return password_page(short_code)
+    raise
 
-    return RedirectResponse(url=original_url, status_code=302)
+  return RedirectResponse(url=original_url, status_code=302)
 
 
 @router.post("/link/{short_code}/unlock", include_in_schema=False)
@@ -119,34 +119,34 @@ async def unlock_link(
     request: Request,
     links_service: LinksService = Depends(get_links_service),
 ) -> Response:
-    if not request.headers.get("content-type", "").startswith(
-        "application/x-www-form-urlencoded"
-    ):
-        raise HTTPException(status_code=415, detail="Expected a form submission")
-    body = await request.body()
-    if len(body) > 4096:
-        raise HTTPException(status_code=413, detail="Form is too large")
-    try:
-        encoded_form = body.decode("utf-8")
-    except UnicodeDecodeError as error:
-        raise HTTPException(status_code=400, detail="Invalid form encoding") from error
-    password = parse_qs(encoded_form, keep_blank_values=True).get("password", [""])[0]
-    try:
-        original_url = await links_service.get_url(
-            short_code,
-            password=password,
-            user_agent=request.headers.get("user-agent"),
-            referrer=request.headers.get("referer"),
-            ip_address=request.client.host if request.client else None,
-        )
-    except (LinkPasswordRequiredError, InvalidLinkPasswordError):
-        return password_page(short_code, invalid=True)
-    return RedirectResponse(url=original_url, status_code=303)
+  if not request.headers.get("content-type", "").startswith(
+      "application/x-www-form-urlencoded"
+  ):
+    raise HTTPException(status_code=415, detail="Expected a form submission")
+  body = await request.body()
+  if len(body) > 4096:
+    raise HTTPException(status_code=413, detail="Form is too large")
+  try:
+    encoded_form = body.decode("utf-8")
+  except UnicodeDecodeError as error:
+    raise HTTPException(status_code=400, detail="Invalid form encoding") from error
+  password = parse_qs(encoded_form, keep_blank_values=True).get("password", [""])[0]
+  try:
+    original_url = await links_service.get_url(
+        short_code,
+        password=password,
+        user_agent=request.headers.get("user-agent"),
+        referrer=request.headers.get("referer"),
+        ip_address=request.client.host if request.client else None,
+    )
+  except (LinkPasswordRequiredError, InvalidLinkPasswordError):
+    return password_page(short_code, invalid=True)
+  return RedirectResponse(url=original_url, status_code=303)
 
 
 @router.get("/dummy-target")
 async def dummy_target() -> dict[str, str]:
-    return {"status": "ok"}
+  return {"status": "ok"}
 
 
 @router.delete(
@@ -163,4 +163,4 @@ async def disable_shortened_url(
     links_service: LinksService = Depends(get_links_service),
     owner_sub: str = Depends(get_current_user),
 ) -> None:
-    await links_service.disable_shortened_url(short_code, owner_sub)
+  await links_service.disable_shortened_url(short_code, owner_sub)

@@ -1,0 +1,14 @@
+vars {
+  accessToken:
+  ttlSeconds: 3600
+  destinationUrl: https://example.com/start
+  updatedDestinationUrl: https://example.com/updated
+}
+
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

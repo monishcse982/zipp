@@ -1,0 +1,38 @@
+meta {
+  name: API login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{cognitoApiUrl}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/x-amz-json-1.1
+  X-Amz-Target: AWSCognitoIdentityProviderService.InitiateAuth
+}
+
+body:json {
+  {
+    "AuthFlow": "USER_PASSWORD_AUTH",
+    "ClientId": "{{cognitoApiClientId}}",
+    "AuthParameters": {
+      "USERNAME": "{{cognitoApiUsername}}",
+      "PASSWORD": "{{cognitoApiPassword}}"
+    }
+  }
+}
+
+script:post-response {
+  test("Cognito API login returns an access token", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().AuthenticationResult.AccessToken).to.be.a("string");
+  });
+
+  if (res.getStatus() === 200) {
+    bru.setVar("accessToken", res.getBody().AuthenticationResult.AccessToken);
+  }
+}

@@ -1,0 +1,21 @@
+meta {
+  name: Disable link
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{baseUrl}}/links/{{e2eCode}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("signed-in owner can disable the link", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

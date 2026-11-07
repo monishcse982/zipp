@@ -110,8 +110,10 @@ The Kafka consumer currently starts inside the FastAPI process during applicatio
 | `GET` | `/metrics` | Expose Prometheus metrics |
 | `GET` | `/docs` | OpenAPI documentation |
 
-A [Bruno collection](bruno/zipp/README.md) provides local
-environments and an ordered create, visit, and disable workflow for the API.
+A [Bruno collection](bruno/zipp/README.md) provides local environments and API
+examples. For a real hosted Cognito login and authenticated create, list, edit,
+redirect, and disable flow, use the separate
+[Cognito E2E collection](bruno/zipp-cognito-e2e/README.md).
 
 Creating and managing links requires a Cognito user access token in the
 `Authorization: Bearer <access-token>` header. Redirects remain public. The API
@@ -201,6 +203,8 @@ LOG_LEVEL=INFO
 LOG_FORMAT=json
 COGNITO_ISSUER=https://cognito-idp.ap-south-2.amazonaws.com/<user-pool-id>
 COGNITO_CLIENT_ID=<public-spa-client-id>
+# Optional comma-separated additional Cognito app clients (for API automation)
+COGNITO_CLIENT_IDS=<api-test-client-id>
 CORS_ORIGINS=http://localhost:5173
 ```
 
