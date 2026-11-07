@@ -50,12 +50,18 @@ PROMETHEUS_PORT ?= 9090
 PORT_FORWARD_FRONTEND ?= 1
 APP_HELM_IMAGE_ARGS = --set-string image.repository=$(IMAGE) --set-string image.tag=$(IMAGE_TAG) --set-string frontend.image.repository=$(FRONTEND_IMAGE) --set-string frontend.image.tag=$(FRONTEND_IMAGE_TAG)
 
-.PHONY: help unit-test coverage app-up app-start frontend-deps frontend-env-check infra-up infra-start infra-stop infra-status cluster-up cluster-stop cluster-status image-build image-load validate-env namespace infra-namespace secret postgres-secret valkey-secret kafka-operator monitoring-install monitoring-status grafana-password postgres-password valkey-password kafka-password prometheus-password grafana-forward prometheus-forward chart-deps chart-validate deploy deploy-infra deploy-app wait-infra wait-app sync-kafka-password infra-ready migration-status status logs port-forward port-forward-app port-forward-all diagnose-port-forward restart uninstall cluster-delete makemigrations migrate
+.PHONY: help unit-test coverage app-up app-start app-redeploy frontend-deps frontend-env-check infra-up infra-start infra-stop infra-status cluster-up cluster-stop cluster-status image-build image-load validate-env namespace infra-namespace secret postgres-secret valkey-secret kafka-operator monitoring-install monitoring-status grafana-password postgres-password valkey-password kafka-password prometheus-password grafana-forward prometheus-forward chart-deps chart-validate deploy deploy-infra deploy-app wait-infra wait-app sync-kafka-password infra-ready migration-status status logs port-forward port-forward-app port-forward-all diagnose-port-forward restart uninstall cluster-delete makemigrations migrate
 
 help: ## Show the available commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target> [VARIABLE=value]\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@printf "\nCommon overrides:\n"
 	@printf "  PROFILE=%s NAMESPACE=%s INFRA_NAMESPACE=%s ENV_FILE=%s LOCAL_PORT=%s\n" "$(PROFILE)" "$(NAMESPACE)" "$(INFRA_NAMESPACE)" "$(ENV_FILE)" "$(LOCAL_PORT)"
+	@printf "\nSuggested workflows:\n"
+	@printf "  First setup:   make app-up\n"
+	@printf "  Resume stack:  make app-start\n"
+	@printf "  Code change:   make app-redeploy\n"
+	@printf "  Full checks:   make chart-validate coverage\n"
+	@printf "  Stop safely:   make infra-stop\n"
 
 unit-test: ## Run unit tests while collecting line and branch coverage.
 	uv run --locked coverage run -m unittest discover -s tests/unit -v
@@ -71,15 +77,18 @@ app-start: frontend-env-check infra-start ## Resume an existing Minikube stack a
 	$(KUBECTL) rollout status --namespace $(NAMESPACE) deployment/$(FRONTEND_SERVICE) --timeout=5m
 	PORT_FORWARD_CORE_ONLY=1 $(MAKE) port-forward-all
 
+app-redeploy: frontend-env-check image-load wait-app ## Rebuild, load, and deploy application images without reinstalling the stack.
+	PORT_FORWARD_CORE_ONLY=1 $(MAKE) port-forward-all
+
 frontend-deps: ## Install locked frontend dependencies if they are missing.
 	@test -d frontend/node_modules || npm --prefix frontend ci
 
 frontend-env-check: ## Validate local UI and API configuration before startup.
 	ENV_FILE="$(ENV_FILE)" LOCAL_PORT="$(LOCAL_PORT)" python3 scripts/check-local-app-config.py
 
-infra-up: image-load infra-ready status ## Start Minikube and deploy the complete application stack.
+infra-up: image-load infra-ready ## Start Minikube and deploy the complete application stack.
 
-infra-start: cluster-up status ## Start the existing Minikube profile without rebuilding.
+infra-start: cluster-up ## Start the existing Minikube profile without rebuilding.
 
 infra-stop: cluster-stop ## Stop Minikube while preserving cluster data.
 
@@ -175,7 +184,7 @@ chart-validate: ## Build dependencies, lint all charts, and render all releases.
 	helm template $(INFRA_RELEASE) $(INFRA_CHART) $(HELM_CONTEXT) --namespace $(INFRA_NAMESPACE) --set valkey.metrics.serviceMonitor.interval=$(SCRAPE_INTERVAL) > $(RENDERED_INFRA_MANIFEST)
 	helm template $(MONITORING_RELEASE) $(OBSERVABILITY_CHART) $(HELM_CONTEXT) --namespace $(MONITORING_NAMESPACE) --set kube-prometheus-stack.prometheus.prometheusSpec.scrapeInterval=$(SCRAPE_INTERVAL) --set kube-prometheus-stack.prometheus.prometheusSpec.evaluationInterval=$(SCRAPE_INTERVAL) > $(RENDERED_OBSERVABILITY_MANIFEST)
 
-deploy-infra: chart-validate postgres-secret valkey-secret kafka-operator monitoring-install ## Install or upgrade PostgreSQL, Valkey, Kafka, and observability.
+deploy-infra: postgres-secret valkey-secret kafka-operator monitoring-install ## Install or upgrade PostgreSQL, Valkey, Kafka, and observability.
 	helm upgrade --install $(INFRA_RELEASE) $(INFRA_CHART) $(HELM_CONTEXT) --namespace $(INFRA_NAMESPACE) --set valkey.metrics.serviceMonitor.interval=$(SCRAPE_INTERVAL) --timeout 5m
 
 wait-infra: deploy-infra ## Wait for infrastructure dependencies and Kafka resources.
@@ -199,7 +208,7 @@ wait-app: deploy-app ## Wait for app migrations and API/UI readiness.
 	$(KUBECTL) rollout status deployment/$(RELEASE) --namespace $(NAMESPACE) --timeout=5m
 	$(KUBECTL) rollout status deployment/$(FRONTEND_SERVICE) --namespace $(NAMESPACE) --timeout=5m
 
-infra-ready: deploy wait-app restart ## Wait for infrastructure, deploy app, and restart to pick up Secrets.
+infra-ready: wait-app ## Wait for infrastructure, deploy the app once, and verify readiness.
 
 migration-status: ## Show migration versions recorded in the cluster database.
 	$(KUBECTL) exec --namespace $(INFRA_NAMESPACE) statefulset/$(POSTGRES_STATEFULSET) -- sh -ec 'export PGPASSWORD="$$(cat /opt/bitnami/postgresql/secrets/password)"; psql -h 127.0.0.1 -U zipp_user -d zipp -c "SELECT app, name, applied_at FROM tortoise_migrations ORDER BY applied_at"'

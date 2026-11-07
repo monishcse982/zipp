@@ -1,0 +1,29 @@
+meta {
+  name: Update destination
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/links/{{e2eCode}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "url": "{{updatedDestinationUrl}}"
+  }
+}
+
+tests {
+  test("signed-in owner can update the destination", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().original_url).to.equal(bru.getVar("updatedDestinationUrl"));
+  });
+}

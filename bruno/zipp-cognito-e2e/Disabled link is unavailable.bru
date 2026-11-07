@@ -1,0 +1,21 @@
+meta {
+  name: Disabled link is unavailable
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/link/{{e2eCode}}
+  body: none
+  auth: none
+}
+
+settings {
+  followRedirects: false
+}
+
+tests {
+  test("disabled public link returns not found", function() {
+    expect(res.getStatus()).to.equal(404);
+  });
+}

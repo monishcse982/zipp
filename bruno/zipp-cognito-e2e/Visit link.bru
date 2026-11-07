@@ -1,0 +1,22 @@
+meta {
+  name: Visit link
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/link/{{e2eCode}}
+  body: none
+  auth: none
+}
+
+settings {
+  followRedirects: false
+}
+
+tests {
+  test("public short link redirects to the updated destination", function() {
+    expect(res.getStatus()).to.equal(302);
+    expect(res.getHeader("location")).to.contain(bru.getVar("updatedDestinationUrl"));
+  });
+}

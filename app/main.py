@@ -10,6 +10,7 @@ from redis.asyncio import Redis
 from tortoise import Tortoise
 
 from app.api.exception_handlers import register_exception_handlers
+from app.api.routes.health import router as health_router
 from app.api.routes.links import router as links_router
 from app.core.config import settings
 from app.core.logging import setup_logging
@@ -78,6 +79,7 @@ app.add_middleware(
     header_name="X-Correlation-ID",
 )
 app.include_router(links_router)
+app.include_router(health_router)
 
 Instrumentator().instrument(app).expose(
     app,

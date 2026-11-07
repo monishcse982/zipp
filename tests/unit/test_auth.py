@@ -51,6 +51,25 @@ class CognitoAuthTests(unittest.IsolatedAsyncioTestCase):
     async def test_valid_access_token_returns_subject(self):
         self.assertEqual(await self.check(self.token()), "user-1")
 
+    async def test_valid_api_client_token_returns_subject(self):
+        with (
+            patch("app.core.auth.settings.cognito_issuer", ISSUER),
+            patch("app.core.auth.settings.cognito_client_id", "spa-client"),
+            patch("app.core.auth.settings.cognito_api_client_id", CLIENT_ID),
+            patch("app.core.auth.jwks_client") as client,
+        ):
+            client.return_value.get_signing_key_from_jwt.return_value = SimpleNamespace(
+                key=self.private_key.public_key()
+            )
+            self.assertEqual(
+                await get_current_user(
+                    HTTPAuthorizationCredentials(
+                        scheme="Bearer", credentials=self.token()
+                    )
+                ),
+                "user-1",
+            )
+
     async def test_rejects_wrong_client_id_token_expired_token_and_machine_token(self):
         for claims in (
             {"client_id": "another-client"},
