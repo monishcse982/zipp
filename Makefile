@@ -70,15 +70,15 @@ coverage: unit-test ## Run unit tests and print the coverage summary.
 	uv run --locked coverage report
 
 app-up: frontend-env-check infra-up ## Deploy the stack and serve the UI at localhost:5173; Ctrl+C stops local forwards.
-	PORT_FORWARD_CORE_ONLY=1 $(MAKE) port-forward-all
+	$(MAKE) port-forward-all
 
 app-start: frontend-env-check infra-start ## Resume an existing Minikube stack and serve the UI without rebuilding or redeploying.
 	$(KUBECTL) rollout status --namespace $(NAMESPACE) deployment/$(RELEASE) --timeout=5m
 	$(KUBECTL) rollout status --namespace $(NAMESPACE) deployment/$(FRONTEND_SERVICE) --timeout=5m
-	PORT_FORWARD_CORE_ONLY=1 $(MAKE) port-forward-all
+	$(MAKE) port-forward-all
 
 app-redeploy: frontend-env-check image-load wait-app ## Rebuild, load, and deploy application images without reinstalling the stack.
-	PORT_FORWARD_CORE_ONLY=1 $(MAKE) port-forward-all
+	$(MAKE) port-forward-all
 
 frontend-deps: ## Install locked frontend dependencies if they are missing.
 	@test -d frontend/node_modules || npm --prefix frontend ci
@@ -129,7 +129,7 @@ secret: namespace validate-env ## Create or update the application Secret from t
 	$(KUBECTL) create secret generic zipp-env --namespace $(NAMESPACE) --from-env-file=$(ENV_FILE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 
 postgres-secret: infra-namespace validate-env ## Create PostgreSQL credentials in the infrastructure namespace.
-	@database_url=$$(awk -F= '$$1 == "DATABASE_URL" { print substr($$0, index($$0, "=") + 1); exit }' "$(ENV_FILE)"); password=$$(printf '%s' "$$database_url" | sed -E 's#^[^:]+://[^:]+:([^@]+)@.*#\1#'); if [ -z "$$password" ] || [ "$$password" = "$$database_url" ]; then echo "Could not extract the PostgreSQL password from DATABASE_URL"; exit 1; fi; $(KUBECTL) create secret generic $(POSTGRES_SECRET) --namespace $(INFRA_NAMESPACE) --from-literal=postgres-password="$$password" --from-literal=password="$$password" --dry-run=client -o yaml | $(KUBECTL) apply -f -
+	@database_url=$$(awk -F= '$$1 == "DATABASE_URL" { print substr($$0, index($$0, "=") + 1); exit }' "$(ENV_FILE)"); password=$$(printf '%s' "$$database_url" | sed -E 's#^[^:]+://[^:]+:([^@]+)@.*#\1#'); if [ -z "$$password" ] || [ "$$password" = "$$database_url" ]; then echo "Could not extract the PostgreSQL password from DATABASE_URL"; exit 1; fi; $(KUBECTL) create secret generic $(POSTGRES_SECRET) --namespace $(INFRA_NAMESPACE) --from-literal=postgres-password="$$password" --from-literal=password="$$password" --from-literal=metrics-password="$$password" --dry-run=client -o yaml | $(KUBECTL) apply -f -
 
 valkey-secret: infra-namespace validate-env ## Create Valkey credentials in the infrastructure namespace.
 	@cache_url=$$(awk -F= '$$1 == "CACHE_URL" { print substr($$0, index($$0, "=") + 1); exit }' "$(ENV_FILE)"); password=$$(printf '%s' "$$cache_url" | sed -E 's#^[^:]+://([^:]*:)?([^@]+)@.*#\2#'); if [ -z "$$password" ] || [ "$$password" = "$$cache_url" ]; then echo "Could not extract the Valkey password from CACHE_URL"; exit 1; fi; $(KUBECTL) create secret generic $(VALKEY_SECRET) --namespace $(INFRA_NAMESPACE) --from-literal=default="$$password" --dry-run=client -o yaml | $(KUBECTL) apply -f -

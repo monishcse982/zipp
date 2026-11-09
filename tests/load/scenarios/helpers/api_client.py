@@ -66,7 +66,10 @@ class ZippApiClient:
 
     def visit_link(self, short_code: str, headers: dict[str, str] | None = None):
         return self.http_client.get(
-            f"/link/{short_code}", headers=headers or {}, allow_redirects=False
+            f"/link/{short_code}",
+            headers=headers or {},
+            allow_redirects=False,
+            catch_response=True,
         )
 
     def update_link(self, short_code: str, url: str):

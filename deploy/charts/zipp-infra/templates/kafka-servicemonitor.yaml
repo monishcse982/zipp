@@ -1,0 +1,20 @@
+{{- if .Values.kafka.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Values.kafka.clusterName }}-kafka
+  labels:
+    app.kubernetes.io/part-of: zipp-infra
+spec:
+  selector:
+    matchLabels:
+      strimzi.io/cluster: {{ .Values.kafka.clusterName }}
+      strimzi.io/kind: Kafka
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  endpoints:
+    - port: tcp-prometheus
+      path: /metrics
+      interval: 15s
+{{- end }}

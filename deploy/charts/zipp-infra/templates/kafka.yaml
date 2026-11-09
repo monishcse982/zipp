@@ -1,4 +1,15 @@
 {{- if .Values.kafka.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.kafka.clusterName }}-metrics
+data:
+  kafka-metrics-config.yml: |
+    lowercaseOutputName: true
+    lowercaseOutputLabelNames: true
+    rules:
+      - pattern: ".*"
+---
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaNodePool
 metadata:
@@ -34,6 +45,12 @@ spec:
   kafka:
     version: 4.3.1
     metadataVersion: 4.3-IV0
+    metricsConfig:
+      type: jmxPrometheusExporter
+      valueFrom:
+        configMapKeyRef:
+          name: {{ .Values.kafka.clusterName }}-metrics
+          key: kafka-metrics-config.yml
     listeners:
       - name: plain
         port: 9092

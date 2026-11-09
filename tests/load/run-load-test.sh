@@ -13,18 +13,36 @@ list_presets() {
 }
 
 usage() {
-  echo "Usage: $0 <preset-name> [--base-url URL] | --list"
+  echo "Usage: $0 <preset-name> [options]"
+  echo
+  echo "Commands:"
+  echo "  --list, -l, list  List available load-test presets"
+  echo "  --help, -h        Show this help"
   echo
   echo "Options:"
-  echo "  --base-url URL  API base URL (default: http://localhost:8080)"
+  echo "  --base-url URL    API base URL (default: http://localhost:8080)"
+  echo
+  echo "Required environment variables:"
+  echo "  COGNITO_CLIENT_ID       Cognito app client ID"
+  echo "  COGNITO_API_USERNAME    Dedicated Cognito load-test username"
+  echo "  COGNITO_API_PASSWORD    Dedicated Cognito load-test password"
+  echo
+  echo "The project .env file is loaded automatically when present."
+  echo "Preset files may define the load shape and duration."
+  echo
+  echo "Examples:"
+  echo "  $0 --list"
+  echo "  $0 mixed_redirect_constant_user_100user_5minutes"
+  echo "  $0 mixed_redirect_spike_user_200user_5minutes --base-url http://localhost:8080"
   echo
   echo "Available presets:"
   list_presets | sed "s/^/  /"
 }
 
-if [[ $# -lt 1 ]]; then
+if [[ $# -lt 1 || "$1" == "--help" || "$1" == "-h" ]]; then
   usage
-  exit 1
+  [[ $# -lt 1 ]] && exit 1
+  exit 0
 fi
 
 if [[ "$1" == "--list" || "$1" == "-l" || "$1" == "list" ]]; then
@@ -34,6 +52,13 @@ if [[ "$1" == "--list" || "$1" == "-l" || "$1" == "list" ]]; then
   fi
   list_presets
   exit 0
+fi
+
+if [[ -f "$PROJECT_DIR/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$PROJECT_DIR/.env"
+  set +a
 fi
 
 PRESET_NAME="${1%.env}"
@@ -84,6 +109,9 @@ fi
 
 : "${SCENARIO_FILE:?SCENARIO_FILE is required in $PRESET_FILE}"
 : "${PATTERN_FILE:?PATTERN_FILE is required in $PRESET_FILE}"
+: "${COGNITO_CLIENT_ID:?Set COGNITO_CLIENT_ID before running a load test}"
+: "${COGNITO_API_USERNAME:?Set COGNITO_API_USERNAME before running a load test}"
+: "${COGNITO_API_PASSWORD:?Set COGNITO_API_PASSWORD before running a load test}"
 
 SCENARIO_PATH="$SCRIPT_DIR/scenarios/$SCENARIO_FILE"
 PATTERN_PATH="$SCRIPT_DIR/patterns/$PATTERN_FILE"
@@ -138,6 +166,9 @@ add_arg INITIAL_DELAY_SECONDS --initial-delay-seconds
 add_arg STEP_DURATION_SECONDS --step-duration-seconds
 add_arg STEP_USERS --step-users
 add_arg MAX_USERS --max-users
+add_arg PHASE_DURATION_SECONDS --phase-duration-seconds
+add_arg PHASE_SPIKE_USERS --phase-spike-users
+add_arg PHASE_SPIKE_DURATION_SECONDS --phase-spike-duration-seconds
 add_arg TARGET_RPS --target-rps
 add_arg ESTIMATED_RPS_PER_USER --estimated-rps-per-user
 
