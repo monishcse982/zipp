@@ -123,6 +123,55 @@ def add_load_pattern_options(parser) -> None:
         help="Duration of the spike in each phase.",
     )
     parser.add_argument(
+        "--baseline-users",
+        type=int,
+        env_var="LOCUST_BASELINE_USERS",
+        default=100,
+        help="Steady user count before and after a burst.",
+    )
+    parser.add_argument(
+        "--burst-users",
+        type=int,
+        env_var="LOCUST_BURST_USERS",
+        default=250,
+        help="Peak user count during a burst.",
+    )
+    parser.add_argument(
+        "--burst-ramp-seconds",
+        type=int,
+        env_var="LOCUST_BURST_RAMP_SECONDS",
+        default=60,
+        help="Time to ramp from zero to the baseline user count.",
+    )
+    parser.add_argument(
+        "--baseline-hold-seconds",
+        type=int,
+        env_var="LOCUST_BASELINE_HOLD_SECONDS",
+        default=120,
+        help="Time to hold baseline load before the burst.",
+    )
+    parser.add_argument(
+        "--burst-duration-seconds",
+        type=int,
+        env_var="LOCUST_BURST_DURATION_SECONDS",
+        default=30,
+        help="Time to hold the burst user count.",
+    )
+    parser.add_argument(
+        "--recovery-seconds",
+        type=int,
+        env_var="LOCUST_RECOVERY_SECONDS",
+        default=60,
+        help="Time to return from burst load to baseline.",
+    )
+    parser.add_argument(
+        "--recovery-hold-seconds",
+        type=int,
+        env_var="LOCUST_RECOVERY_HOLD_SECONDS",
+        default=120,
+        help="Time to observe the system at baseline after recovery.",
+    )
+    parser.add_argument(
         "--target-rps",
         type=int,
         env_var="LOCUST_TARGET_RPS",

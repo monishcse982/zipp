@@ -169,6 +169,13 @@ add_arg MAX_USERS --max-users
 add_arg PHASE_DURATION_SECONDS --phase-duration-seconds
 add_arg PHASE_SPIKE_USERS --phase-spike-users
 add_arg PHASE_SPIKE_DURATION_SECONDS --phase-spike-duration-seconds
+add_arg BASELINE_USERS --baseline-users
+add_arg BURST_USERS --burst-users
+add_arg BURST_RAMP_SECONDS --burst-ramp-seconds
+add_arg BASELINE_HOLD_SECONDS --baseline-hold-seconds
+add_arg BURST_DURATION_SECONDS --burst-duration-seconds
+add_arg RECOVERY_SECONDS --recovery-seconds
+add_arg RECOVERY_HOLD_SECONDS --recovery-hold-seconds
 add_arg TARGET_RPS --target-rps
 add_arg ESTIMATED_RPS_PER_USER --estimated-rps-per-user
 

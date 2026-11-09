@@ -53,16 +53,33 @@ class ZippApiClient:
         headers.update(extra or {})
         return headers
 
-    def create_link(self, payload: dict[str, Any]):
-        return self.http_client.post("/link/", json=payload, headers=self._headers())
-
-    def list_links(self, limit: int = 100, offset: int = 0):
-        return self.http_client.get(
-            f"/links?limit={limit}&offset={offset}", headers=self._headers()
+    def create_link(self, payload: dict[str, Any], *, name: str = "POST /link/"):
+        return self.http_client.post(
+            "/link/",
+            json=payload,
+            headers=self._headers(),
+            name=name,
         )
 
-    def get_link(self, short_code: str):
-        return self.http_client.get(f"/links/{short_code}", headers=self._headers())
+    def list_links(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        *,
+        name: str = "GET /links",
+    ):
+        return self.http_client.get(
+            f"/links?limit={limit}&offset={offset}",
+            headers=self._headers(),
+            name=name,
+        )
+
+    def get_link(self, short_code: str, *, name: str = "GET /links/{short_code}"):
+        return self.http_client.get(
+            f"/links/{short_code}",
+            headers=self._headers(),
+            name=name,
+        )
 
     def visit_link(self, short_code: str, headers: dict[str, str] | None = None):
         return self.http_client.get(
@@ -70,12 +87,31 @@ class ZippApiClient:
             headers=headers or {},
             allow_redirects=False,
             catch_response=True,
+            name="GET /link/{short_code}",
         )
 
-    def update_link(self, short_code: str, url: str):
+    def update_link(
+        self,
+        short_code: str,
+        url: str,
+        *,
+        name: str = "PATCH /links/{short_code}",
+    ):
         return self.http_client.patch(
-            f"/links/{short_code}", json={"url": url}, headers=self._headers()
+            f"/links/{short_code}",
+            json={"url": url},
+            headers=self._headers(),
+            name=name,
         )
 
-    def disable_link(self, short_code: str):
-        return self.http_client.delete(f"/links/{short_code}", headers=self._headers())
+    def disable_link(
+        self,
+        short_code: str,
+        *,
+        name: str = "DELETE /links/{short_code}",
+    ):
+        return self.http_client.delete(
+            f"/links/{short_code}",
+            headers=self._headers(),
+            name=name,
+        )

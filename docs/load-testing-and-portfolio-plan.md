@@ -38,6 +38,15 @@ The current `mixed_redirect_traffic` scenario is a good general baseline. Add
 profiles that isolate different production behaviors rather than increasing
 load blindly.
 
+The first four runnable profiles are:
+
+| Test | Preset | Purpose |
+| --- | --- | --- |
+| Management API | `management_api_constant_user_50user_10minutes` | Read-heavy authenticated list and detail traffic with occasional mutations |
+| Write-heavy creation | `write_heavy_constant_user_50user_10minutes` | Sustained creation across policy, TTL, title, and visit-limit variants |
+| Burst and recovery | `mixed_redirect_burst_recovery_250user_6m30s` | Establish baseline, burst to 250 users, return to baseline, and observe recovery |
+| Soak | `mixed_redirect_soak_50user_60minutes` | Hold moderate mixed redirect traffic for one hour |
+
 ### Read-heavy redirect traffic
 
 - 95% public redirects

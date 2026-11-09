@@ -2,5 +2,13 @@
 set -eu
 
 repo_root=$(git rev-parse --show-toplevel)
+
+if ! command -v ggshield >/dev/null 2>&1; then
+    printf 'ggshield is required to scan staged changes before committing.\n' >&2
+    printf 'Install it and run: ggshield auth login\n' >&2
+    exit 1
+fi
+
 git diff --cached --check
 python3 "$repo_root/scripts/check-git-content.py" --staged
+ggshield secret scan pre-commit --no-check-for-updates
