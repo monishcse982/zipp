@@ -1,5 +1,10 @@
 # Zipp Bruno collection
 
+This collection contains individual API examples and assumes that you provide
+a user access token manually. For an end-to-end browser sign-in through hosted
+Cognito followed by authenticated API requests, use the separate
+[Zipp Cognito E2E collection](../zipp-cognito-e2e/README.md).
+
 Open this directory as a collection in Bruno. Select **Local 8080** when using
 `make port-forward-app` (the default port is 8080), or **Local 8000** for a
 standalone server on port 8000. Change `baseUrl` in the chosen environment if

@@ -1,6 +1,12 @@
 postgresql:
   enabled: true
 
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 15s
+
   auth:
     existingSecret: zipp-postgresql
     username: zipp_user

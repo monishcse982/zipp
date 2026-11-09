@@ -21,14 +21,21 @@ service:
   type: ClusterIP
   port: 8000
 
+startupProbe:
+  httpGet:
+    path: /health/live
+    port: http
+  failureThreshold: 30
+  periodSeconds: 2
+
 livenessProbe:
   httpGet:
-    path: /metrics
+    path: /health/live
     port: http
 
 readinessProbe:
   httpGet:
-    path: /metrics
+    path: /health/ready
     port: http
 
 resources:

@@ -71,6 +71,13 @@ class KafkaProducer:
 
         logger.info("Kafka producer flush completed")
 
+    def is_available(self) -> bool:
+        try:
+            self._producer.list_topics(None, 30)
+            return True
+        except KafkaException:
+            return False
+
     @staticmethod
     def _delivery_report(error, message) -> None:
         key = message.key().decode("utf-8") if message.key() else None

@@ -24,7 +24,13 @@ from app.core.exceptions import (
     UnauthorizedError,
 )
 from app.core.metrics import (
+    MetricOperation,
+    MetricPolicy,
+    list_links_latency_seconds,
     short_link_access_request_count,
+    short_link_disable_duration_seconds,
+    short_link_redirect_duration_seconds,
+    short_link_update_duration_seconds,
     short_links_create_duration_seconds,
     short_links_created,
     short_links_creation_error,
@@ -62,8 +68,12 @@ class LinksService:
     async def shorten_url(
         self, request: ShortenRequest, owner_sub: str
     ) -> ShortenResponse:
+        policy_type = request.policy.type.value
         short_links_creation_requests.inc()
-        with short_links_create_duration_seconds.time():
+        with short_links_create_duration_seconds.labels(
+            operation=MetricOperation.CREATE_LINK.value,
+            policy=policy_type,
+        ).time():
             try:
                 expires_at = datetime.now(UTC) + timedelta(seconds=request.ttl_seconds)
                 policy_config = request.policy.model_dump(
@@ -77,8 +87,6 @@ class LinksService:
                         request.policy.password
                     )
 
-                # Retry only generated codes: a caller-supplied code collision is
-                # deterministic and should be reported as a client conflict.
                 attempts = 5 if request.short_code is None else 1
                 for attempt in range(attempts):
                     short_code = request.short_code or self._generate_code()
@@ -148,25 +156,30 @@ class LinksService:
     ) -> str:
         short_link_access_request_count.inc()
         link, resolved_from_cache = await self._resolve_link(short_code)
-        await self._ensure_link_can_be_visited(link)
-        self._authorize_visit(link, password=password, ip_address=ip_address)
-        await self._admit_visit_if_limited(link)
+        policy_type = self._metric_policy_type(link)
+        with short_link_redirect_duration_seconds.labels(
+            operation=MetricOperation.REDIRECT_LINK.value,
+            policy=policy_type,
+        ).time():
+            await self._ensure_link_can_be_visited(link)
+            self._authorize_visit(link, password=password, ip_address=ip_address)
+            await self._admit_visit_if_limited(link)
 
-        if (
-            not resolved_from_cache
-            and (link.policy or {}).get("type", "public") == "public"
-        ):
-            await self._cache_if_eligible(link)
+            if (
+                not resolved_from_cache
+                and (link.policy or {}).get("type", "public") == "public"
+            ):
+                await self._cache_if_eligible(link)
 
-        self._publish_visit_event(
-            link=link,
-            user_agent=user_agent,
-            referrer=referrer,
-            ip_address=ip_address,
-        )
+            self._publish_visit_event(
+                link=link,
+                user_agent=user_agent,
+                referrer=referrer,
+                ip_address=ip_address,
+            )
 
-        self._record_cache_resolution(link, resolved_from_cache)
-        return str(link.original_url)
+            self._record_cache_resolution(link, resolved_from_cache)
+            return str(link.original_url)
 
     @staticmethod
     def _authorize_visit(
@@ -268,9 +281,6 @@ class LinksService:
             link=link,
             ttl_seconds=min(settings.cache_ttl, remaining_ttl),
         )
-        # A destination edit or disable may have invalidated the cache after
-        # this request read the row but before it filled the cache. Recheck
-        # after writing so an older value cannot survive that invalidation.
         current = await self.links_repository.find_by_short_code(str(link.short_code))
         if (
             current is None
@@ -402,12 +412,15 @@ class LinksService:
     async def list_managed_links(
         self, owner_sub: str, *, limit: int, offset: int
     ) -> ManagedLinkList:
-        links, total = await self.links_repository.list_by_owner(
-            owner_sub, limit=limit, offset=offset
-        )
-        return ManagedLinkList(
-            items=[self._managed_link(link) for link in links], total=total
-        )
+        with list_links_latency_seconds.labels(
+            operation=MetricOperation.LIST_LINKS.value,
+        ).time():
+            links, total = await self.links_repository.list_by_owner(
+                owner_sub, limit=limit, offset=offset
+            )
+            return ManagedLinkList(
+                items=[self._managed_link(link) for link in links], total=total
+            )
 
     async def get_managed_link(self, short_code: str, owner_sub: str) -> ManagedLink:
         link = await self._owned_link(short_code, owner_sub)
@@ -416,38 +429,48 @@ class LinksService:
     async def update_destination(
         self, short_code: str, owner_sub: str, original_url: str
     ) -> ManagedLink:
-        link = await self._owned_link(short_code, owner_sub)
-        if self._managed_link(link).status != "active":
-            raise ResourceGoneError(
-                resource="Short link", identifier=short_code, reason="Link is disabled"
+        with short_link_update_duration_seconds.labels(
+            operation=MetricOperation.UPDATE_LINK.value,
+        ).time():
+            link = await self._owned_link(short_code, owner_sub)
+            if self._managed_link(link).status != "active":
+                raise ResourceGoneError(
+                    resource="Short link",
+                    identifier=short_code,
+                    reason="Link is disabled",
+                )
+            updated = await self.links_repository.update_destination(
+                short_code, owner_sub, original_url
             )
-        updated = await self.links_repository.update_destination(
-            short_code, owner_sub, original_url
-        )
-        if updated is None:
-            raise ResourceGoneError(
-                resource="Short link", identifier=short_code, reason="Link is disabled"
-            )
-        await self.invalidate_cached_link(short_code)
-        return self._managed_link(updated)
+            if updated is None:
+                raise ResourceGoneError(
+                    resource="Short link",
+                    identifier=short_code,
+                    reason="Link is disabled",
+                )
+            await self.invalidate_cached_link(short_code)
+            return self._managed_link(updated)
 
     async def disable_shortened_url(self, short_code: str, owner_sub: str) -> None:
-        logger.info("Disabling short link short_code=%s", short_code)
-        await self._owned_link(short_code, owner_sub)
-        link = await self.links_repository.soft_delete_owned(short_code, owner_sub)
+        with short_link_disable_duration_seconds.labels(
+            operation=MetricOperation.DISABLE_LINK.value,
+        ).time():
+            logger.info("Disabling short link short_code=%s", short_code)
+            await self._owned_link(short_code, owner_sub)
+            link = await self.links_repository.soft_delete_owned(short_code, owner_sub)
 
-        if link is None:
-            raise ResourceNotFoundError(
-                resource="Active short link",
-                identifier=short_code,
+            if link is None:
+                raise ResourceNotFoundError(
+                    resource="Active short link",
+                    identifier=short_code,
+                )
+
+            await self.invalidate_cached_link(short_code)
+            logger.info(
+                "Short link disabled link_id=%s short_code=%s",
+                link.id,
+                link.short_code,
             )
-
-        await self.invalidate_cached_link(short_code)
-        logger.info(
-            "Short link disabled link_id=%s short_code=%s",
-            link.id,
-            link.short_code,
-        )
 
     async def _owned_link(self, short_code: str, owner_sub: str) -> Link:
         link = await self.links_repository.find_by_short_code(short_code)
@@ -456,6 +479,15 @@ class LinksService:
         if link.owner_sub != owner_sub:
             raise ForbiddenError()
         return link
+
+    @staticmethod
+    def _metric_policy_type(link: Link) -> str:
+        policy = link.policy if isinstance(link.policy, dict) else {}
+        raw_policy_type = policy.get("type", MetricPolicy.PUBLIC.value)
+        try:
+            return MetricPolicy(str(raw_policy_type)).value
+        except ValueError:
+            return MetricPolicy.PUBLIC.value
 
     @staticmethod
     def _managed_link(link: Link) -> ManagedLink:

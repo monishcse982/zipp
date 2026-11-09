@@ -1,0 +1,17 @@
+meta {
+  name: Unauthenticated management is rejected
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/links?limit=1&offset=0
+  body: none
+  auth: none
+}
+
+tests {
+  test("management endpoint rejects requests without Cognito auth", function() {
+    expect(res.getStatus()).to.equal(401);
+  });
+}

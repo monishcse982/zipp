@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     cache_ttl: int = 600
     cognito_issuer: str = ""
     cognito_client_id: str = ""
+    cognito_api_client_id: str = ""
     cors_origins: str = "http://localhost:5173"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -35,6 +36,14 @@ class Settings(BaseSettings):
         if default_port:
             return f"{self.app_scheme}://{self.app_host}"
         return f"{self.app_scheme}://{self.app_host}:{self.app_port}"
+
+    @property
+    def allowed_cognito_client_ids(self) -> tuple[str, ...]:
+        return tuple(
+            client_id
+            for client_id in (self.cognito_client_id, self.cognito_api_client_id)
+            if client_id
+        )
 
 
 settings = Settings()

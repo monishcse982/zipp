@@ -1,7 +1,25 @@
+import enum
+
 from prometheus_client import Counter, Histogram
 
+
+class MetricOperation(enum.StrEnum):
+    CREATE_LINK = "create_link"
+    REDIRECT_LINK = "redirect_link"
+    LIST_LINKS = "list_links"
+    UPDATE_LINK = "update_link"
+    DISABLE_LINK = "disable_link"
+
+
+class MetricPolicy(enum.StrEnum):
+    PUBLIC = "public"
+    PASSWORD_PROTECTED = "password_protected"
+    IP_RESTRICTED = "ip_restricted"
+
+
 short_links_creation_requests = Counter(
-    "short_links_creation_requests", "Total number of short links creation requests"
+    "short_links_creation_requests",
+    "Total number of short links creation requests",
 )
 
 short_links_created = Counter(
@@ -15,7 +33,9 @@ short_links_creation_error = Counter(
 )
 
 short_links_create_duration_seconds = Histogram(
-    "short_links_create_duration_seconds", "Time spent creating short links"
+    "short_links_create_duration_seconds",
+    "Time spent creating short links",
+    ["operation", "policy"],
 )
 
 short_link_access_request_count = Counter(
@@ -23,6 +43,28 @@ short_link_access_request_count = Counter(
     "Total number of short link access requests",
 )
 
+short_link_redirect_duration_seconds = Histogram(
+    "short_link_redirect_duration_seconds",
+    "Time spent resolving a public short link",
+    ["operation", "policy"],
+)
+
+list_links_latency_seconds = Histogram(
+    "list_links_latency_seconds",
+    "Time spent listing links",
+    ["operation"],
+)
+short_link_update_duration_seconds = Histogram(
+    "short_link_update_duration_seconds",
+    "Time spent updating short links",
+    ["operation"],
+)
+
+short_link_disable_duration_seconds = Histogram(
+    "short_link_disable_duration_seconds",
+    "Time spent disabling short links",
+    ["operation"],
+)
 
 kafka_publish_requests = Counter(
     "kafka_publish_requests",
@@ -96,6 +138,8 @@ time_limited_link_cache_misses = Counter(
 )
 
 __all__ = [
+    "MetricOperation",
+    "MetricPolicy",
     "kafka_message_processing_duration_seconds",
     "kafka_message_processing_error",
     "kafka_messages_committed",
@@ -107,10 +151,14 @@ __all__ = [
     "kafka_publish_requests",
     "kafka_publish_success",
     "short_link_access_request_count",
+    "short_link_disable_duration_seconds",
+    "short_link_redirect_duration_seconds",
+    "short_link_update_duration_seconds",
     "short_links_create_duration_seconds",
     "short_links_created",
     "short_links_creation_error",
     "short_links_creation_requests",
     "time_limited_link_cache_hits",
     "time_limited_link_cache_misses",
+    "list_links_latency_seconds",
 ]

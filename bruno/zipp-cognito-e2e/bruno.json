@@ -1,0 +1,10 @@
+{
+  "version": "1",
+  "name": "Zipp Cognito E2E",
+  "type": "collection",
+  "defaultEnvironment": "Local Cognito",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

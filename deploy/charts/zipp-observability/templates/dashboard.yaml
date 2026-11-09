@@ -8,4 +8,6 @@ metadata:
 data:
   zipp.json: |-
 {{ .Files.Get "dashboards/zipp.json" | indent 4 }}
+  zipp-infrastructure.json: |-
+{{ .Files.Get "dashboards/zipp-infrastructure.json" | indent 4 }}
 {{- end }}

@@ -102,6 +102,27 @@ def add_load_pattern_options(parser) -> None:
         help="Maximum users for stepUsers.",
     )
     parser.add_argument(
+        "--phase-duration-seconds",
+        type=int,
+        env_var="LOCUST_PHASE_DURATION_SECONDS",
+        default=300,
+        help="Duration of each ramp-up or ramp-down phase.",
+    )
+    parser.add_argument(
+        "--phase-spike-users",
+        type=int,
+        env_var="LOCUST_PHASE_SPIKE_USERS",
+        default=50,
+        help="Additional users during the spike in each phase.",
+    )
+    parser.add_argument(
+        "--phase-spike-duration-seconds",
+        type=int,
+        env_var="LOCUST_PHASE_SPIKE_DURATION_SECONDS",
+        default=30,
+        help="Duration of the spike in each phase.",
+    )
+    parser.add_argument(
         "--target-rps",
         type=int,
         env_var="LOCUST_TARGET_RPS",

@@ -1,0 +1,44 @@
+meta {
+  name: Create link
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/link/
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "url": "{{destinationUrl}}",
+    "ttl_seconds": {{ttlSeconds}},
+    "title": "Google",
+    "short_code": "google",
+    "policy": {
+      "type": "public"
+    }
+  }
+}
+
+script:pre-request {
+  const suffix = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  bru.setVar("e2eCode", "e2e-" + suffix);
+}
+
+script:post-response {
+  test("Cognito user can create a link", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().shortened_url).to.be.a("string");
+  });
+
+  if (res.getStatus() === 200) {
+    bru.setVar("e2eUrl", res.getBody().shortened_url);
+  }
+}

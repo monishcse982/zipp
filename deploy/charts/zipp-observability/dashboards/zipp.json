@@ -529,8 +529,8 @@
                       "group": "prometheus",
                       "kind": "DataQuery",
                       "spec": {
-                        "expr": "sum(rate(short_links_create_duration_seconds_sum[1m])) / clamp_min(sum(rate(short_links_create_duration_seconds_count[1m])), 1e-9)",
-                        "legendFormat": "Average"
+                        "expr": "histogram_quantile(0.50, sum by (le, operation) (rate(short_links_create_duration_seconds_bucket[5m]))) or histogram_quantile(0.50, sum by (le, operation) (rate(list_links_latency_seconds_bucket[5m])))",
+                        "legendFormat": "p50 {{operation}}"
                       },
                       "version": "v0"
                     },
@@ -548,12 +548,50 @@
                       "group": "prometheus",
                       "kind": "DataQuery",
                       "spec": {
-                        "expr": "histogram_quantile(0.95, sum by (le) (rate(short_links_create_duration_seconds_bucket[5m])))",
-                        "legendFormat": "p95"
+                        "expr": "histogram_quantile(0.75, sum by (le, operation) (rate(short_links_create_duration_seconds_bucket[5m]))) or histogram_quantile(0.75, sum by (le, operation) (rate(list_links_latency_seconds_bucket[5m])))",
+                        "legendFormat": "p75 {{operation}}"
                       },
                       "version": "v0"
                     },
                     "refId": "B"
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "expr": "histogram_quantile(0.90, sum by (le, operation) (rate(short_links_create_duration_seconds_bucket[5m]))) or histogram_quantile(0.90, sum by (le, operation) (rate(list_links_latency_seconds_bucket[5m])))",
+                        "legendFormat": "p90 {{operation}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "C"
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "expr": "histogram_quantile(0.99, sum by (le, operation) (rate(short_links_create_duration_seconds_bucket[5m]))) or histogram_quantile(0.99, sum by (le, operation) (rate(list_links_latency_seconds_bucket[5m])))",
+                        "legendFormat": "p99 {{operation}}"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "D"
                   }
                 }
               ],
@@ -564,7 +602,7 @@
           "description": "",
           "id": 5,
           "links": [],
-          "title": "Link Creation Latency",
+          "title": "Operation Latency (Create / List)",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -1505,7 +1543,7 @@
       "timezone": "browser",
       "to": "now"
     },
-    "title": "Zipp",
+    "title": "Zipp Application",
     "variables": []
   }
 }

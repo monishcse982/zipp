@@ -25,6 +25,7 @@ router = APIRouter(tags=["shorten-requests"])
 logger = logging.getLogger(__name__)
 
 
+# Dependency providers keep infrastructure construction out of route handlers.
 def get_links_repository() -> LinksRepository:
     return LinksRepository()
 
@@ -49,6 +50,8 @@ def get_links_service(
     return LinksService(links_repository, producer, cache)
 
 
+# Authenticated link-management endpoints. The Cognito subject is passed to the
+# service so ownership checks remain in the business layer.
 @router.post("/link/", response_model=ShortenResponse)
 async def shorten_url(
     request: ShortenRequest,
@@ -90,6 +93,8 @@ async def update_destination(
     )
 
 
+# Public redirect endpoint. Password-protected links can return the HTML form
+# instead of raising an API error when the caller accepts HTML.
 @router.get("/link/{short_code}")
 async def redirect_to_url(
     short_code: str,
@@ -113,6 +118,8 @@ async def redirect_to_url(
     return RedirectResponse(url=original_url, status_code=302)
 
 
+# Browser form handler for password-protected links. This route is intentionally
+# hidden from the generated API schema because it is an HTML flow.
 @router.post("/link/{short_code}/unlock", include_in_schema=False)
 async def unlock_link(
     short_code: str,
@@ -144,11 +151,14 @@ async def unlock_link(
     return RedirectResponse(url=original_url, status_code=303)
 
 
+# Lightweight endpoint used by local checks and load-test wiring.
 @router.get("/dummy-target")
 async def dummy_target() -> dict[str, str]:
     return {"status": "ok"}
 
 
+# Both paths are supported for compatibility; the singular alias is hidden
+# from OpenAPI documentation.
 @router.delete(
     "/links/{short_code}",
     status_code=status.HTTP_204_NO_CONTENT,

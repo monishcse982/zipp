@@ -17,6 +17,19 @@ class ApplicationError(Exception):
         super().__init__(message)
 
 
+class TestConfigurationError(Exception):
+    code = "test_configuration_error"
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        details: dict[str, str] | None = None,
+    ) -> None:
+        self.details = details or {}
+        super().__init__(message)
+
+
 class UnauthorizedError(ApplicationError):
     code = "unauthorized"
     status_code = HTTPStatus.UNAUTHORIZED

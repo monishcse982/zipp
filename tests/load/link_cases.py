@@ -1,7 +1,5 @@
 """Supported policy variants shared by the Locust scenarios."""
 
-import os
-
 LINK_TYPES = ("public", "password_protected", "ip_restricted")
 VISIT_LIMIT = 10
 LIMIT_PROFILES = (
@@ -34,10 +32,7 @@ def visit_headers_for(link_type: str) -> dict[str, str]:
     return {}
 
 
-def creation_headers() -> dict[str, str]:
-    token = os.environ.get("LOAD_ACCESS_TOKEN")
-    if not token:
-        raise RuntimeError(
-            "LOAD_ACCESS_TOKEN is required for authenticated link creation"
-        )
-    return {"Authorization": f"Bearer {token}"}
+def creation_headers(cognito_token: str) -> dict[str, str]:
+    if not cognito_token:
+        raise RuntimeError("Bearer token is required for authenticated link creation")
+    return {"Authorization": f"Bearer {cognito_token}"}

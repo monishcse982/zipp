@@ -1,0 +1,23 @@
+meta {
+  name: Get link
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/links/google
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("signed-in owner can read the created link", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().short_code).to.equal(bru.getVar("e2eCode"));
+    expect(res.getBody().original_url).to.equal(bru.getVar("destinationUrl"));
+  });
+}

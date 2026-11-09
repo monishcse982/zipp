@@ -44,6 +44,9 @@ reports/
 
 deploy/charts/*/charts/*.tgz
 
+# Bruno environments may contain local Cognito credentials
+bruno/zipp-cognito-e2e/environments/Local Cognito.bru
+
 # Local cloud configuration, keys, and infrastructure state
 .aws/
 .kube/

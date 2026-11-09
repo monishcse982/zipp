@@ -21,7 +21,7 @@ def jwks_client(issuer: str) -> PyJWKClient:
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
 ) -> str:
-    if not settings.cognito_issuer or not settings.cognito_client_id:
+    if not settings.cognito_issuer or not settings.allowed_cognito_client_ids:
         raise ApplicationError("Cognito authentication is not configured")
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise UnauthorizedError(message="Bearer access token required")
@@ -43,8 +43,9 @@ async def get_current_user(
         )
         if (
             claims.get("token_use") != "access"
-            or not hmac.compare_digest(
-                str(claims["client_id"]), settings.cognito_client_id
+            or not any(
+                hmac.compare_digest(str(claims["client_id"]), client_id)
+                for client_id in settings.allowed_cognito_client_ids
             )
             or not isinstance(claims["sub"], str)
             or not claims["sub"]

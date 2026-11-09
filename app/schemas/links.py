@@ -67,7 +67,6 @@ class ShortenResponse(BaseModel):
 
 class LinkUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
     url: HttpUrl = Field(max_length=2048)
 
 
