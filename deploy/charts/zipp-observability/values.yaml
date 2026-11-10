@@ -12,6 +12,25 @@ kube-prometheus-stack:
     enabled: true
     defaultDashboardsEnabled: false
 
+    grafana.ini:
+      auth.anonymous:
+        enabled: true
+        org_role: Viewer
+
+    imageRenderer:
+      enabled: true
+      image:
+        tag: v5.12.10
+        sha: a7970b826f6e477461e02bf5463d92634e9ad27d525e4e50296978a2e592d2d7
+        pullPolicy: IfNotPresent
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi
+
     sidecar:
       resources:
         requests:

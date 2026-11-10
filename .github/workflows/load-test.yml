@@ -36,6 +36,10 @@ jobs:
     runs-on: [self-hosted, linux, x64, zipp-load]
     timeout-minutes: 90
     environment: load-test-ec2
+    outputs:
+      pages_artifact: ${{ steps.pages.outputs.artifact_name }}
+      pages_ready: ${{ steps.pages.outputs.ready }}
+      run_key: ${{ steps.pages.outputs.run_key }}
 
     steps:
       - name: Check out source
@@ -94,6 +98,44 @@ jobs:
           echo "Readiness response:"
           python3 -m json.tool "$RUNNER_TEMP/zipp-ready.json"
 
+      - name: Verify Grafana image rendering
+        env:
+          GRAFANA_BASE_URL: ${{ vars.GRAFANA_BASE_URL }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${GRAFANA_BASE_URL:-}" ]]; then
+            echo "GRAFANA_BASE_URL is not configured" >&2
+            exit 1
+          fi
+
+          grafana_url="${GRAFANA_BASE_URL%/}"
+          curl --fail --silent --show-error --max-time 10 \
+            "$grafana_url/api/health" \
+            --output "$RUNNER_TEMP/grafana-health.json"
+          python3 -m json.tool "$RUNNER_TEMP/grafana-health.json"
+
+          curl --fail --silent --show-error \
+            --retry 3 \
+            --retry-all-errors \
+            --max-time 120 \
+            --get "$grafana_url/render/d/zipp/zipp-application" \
+            --data-urlencode "from=now-5m" \
+            --data-urlencode "to=now" \
+            --data-urlencode "tz=UTC" \
+            --data-urlencode "width=800" \
+            --data-urlencode "height=600" \
+            --output "$RUNNER_TEMP/grafana-render-check.png"
+
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["RUNNER_TEMP"]) / "grafana-render-check.png"
+          if not path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"):
+              raise RuntimeError("Grafana render preflight did not return a PNG")
+          PY
+
       - name: Run Locust
         id: load
         env:
@@ -105,10 +147,12 @@ jobs:
         run: |
           set -uo pipefail
 
+          test_started_at_ms="$(date +%s%3N)"
           touch "$RUNNER_TEMP/load-test-start"
           tests/load/run-load-test.sh "$PRESET" \
             --base-url "$LOAD_TEST_BASE_URL"
           load_exit_code=$?
+          test_ended_at_ms="$(date +%s%3N)"
 
           run_dir="$(
             find "reports/load/$PRESET" \
@@ -127,7 +171,73 @@ jobs:
           fi
 
           echo "run_dir=$run_dir" >> "$GITHUB_OUTPUT"
+          echo "test_started_at_ms=$test_started_at_ms" >> "$GITHUB_OUTPUT"
+          echo "test_ended_at_ms=$test_ended_at_ms" >> "$GITHUB_OUTPUT"
           exit "$load_exit_code"
+
+      - name: Capture Grafana dashboards
+        id: grafana
+        if: ${{ always() && steps.load.outputs.run_dir != '' }}
+        env:
+          RUN_DIR: ${{ steps.load.outputs.run_dir }}
+          GRAFANA_BASE_URL: ${{ vars.GRAFANA_BASE_URL }}
+          TEST_STARTED_AT_MS: ${{ steps.load.outputs.test_started_at_ms }}
+          TEST_ENDED_AT_MS: ${{ steps.load.outputs.test_ended_at_ms }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${GRAFANA_BASE_URL:-}" ]]; then
+            echo "GRAFANA_BASE_URL is not configured" >&2
+            exit 1
+          fi
+
+          grafana_url="${GRAFANA_BASE_URL%/}"
+          capture_from=$((TEST_STARTED_AT_MS - 15000))
+          capture_to=$((TEST_ENDED_AT_MS + 30000))
+
+          echo "Waiting for the final Prometheus scrapes..."
+          sleep 30
+
+          curl --fail --silent --show-error \
+            --retry 5 \
+            --retry-all-errors \
+            --max-time 120 \
+            --get "$grafana_url/render/d/zipp/zipp-application" \
+            --data-urlencode "from=$capture_from" \
+            --data-urlencode "to=$capture_to" \
+            --data-urlencode "tz=UTC" \
+            --data-urlencode "width=1600" \
+            --data-urlencode "height=2200" \
+            --data-urlencode "kiosk" \
+            --output "$RUN_DIR/grafana-application.png"
+
+          curl --fail --silent --show-error \
+            --retry 5 \
+            --retry-all-errors \
+            --max-time 120 \
+            --get "$grafana_url/render/d/zipp-infrastructure/zipp-infrastructure" \
+            --data-urlencode "from=$capture_from" \
+            --data-urlencode "to=$capture_to" \
+            --data-urlencode "tz=UTC" \
+            --data-urlencode "width=1600" \
+            --data-urlencode "height=1800" \
+            --data-urlencode "kiosk" \
+            --output "$RUN_DIR/grafana-infrastructure.png"
+
+          uv run --locked --no-sync python - <<'PY'
+          import os
+          from pathlib import Path
+
+          for filename in (
+              "grafana-application.png",
+              "grafana-infrastructure.png",
+          ):
+              path = Path(os.environ["RUN_DIR"]) / filename
+              if path.stat().st_size < 10_000:
+                  raise RuntimeError(f"Rendered image is unexpectedly small: {filename}")
+              if not path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"):
+                  raise RuntimeError(f"Rendered output is not a PNG: {filename}")
+          PY
 
       - name: Write sanitized run metadata
         if: ${{ always() && steps.load.outputs.run_dir != '' }}
@@ -136,6 +246,9 @@ jobs:
           PRESET: ${{ inputs.preset }}
           RUN_NOTE: ${{ inputs.run_note }}
           LOAD_TEST_ENVIRONMENT: ${{ vars.LOAD_TEST_ENVIRONMENT }}
+          TEST_STARTED_AT_MS: ${{ steps.load.outputs.test_started_at_ms }}
+          TEST_ENDED_AT_MS: ${{ steps.load.outputs.test_ended_at_ms }}
+          GRAFANA_CAPTURE_OUTCOME: ${{ steps.grafana.outcome }}
         run: |
           uv run --locked --no-sync python - <<'PY'
           import json
@@ -143,9 +256,20 @@ jobs:
           from datetime import UTC, datetime
           from pathlib import Path
 
+          started_at = datetime.fromtimestamp(
+              int(os.environ["TEST_STARTED_AT_MS"]) / 1000, tz=UTC
+          )
+          ended_at = datetime.fromtimestamp(
+              int(os.environ["TEST_ENDED_AT_MS"]) / 1000, tz=UTC
+          )
+          run_key = (
+              f"{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}-"
+              f"{os.environ['GITHUB_SHA'][:7]}"
+          )
           metadata = {
               "commit_sha": os.environ["GITHUB_SHA"],
               "environment": os.environ.get("LOAD_TEST_ENVIRONMENT", "not-set"),
+              "grafana_capture_outcome": os.environ["GRAFANA_CAPTURE_OUTCOME"],
               "github_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
               "github_run_id": os.environ["GITHUB_RUN_ID"],
               "github_run_url": (
@@ -154,8 +278,11 @@ jobs:
               ),
               "preset": os.environ["PRESET"],
               "recorded_at_utc": datetime.now(UTC).isoformat(),
+              "run_key": run_key,
               "run_note": os.environ["RUN_NOTE"],
               "runner_name": os.environ["RUNNER_NAME"],
+              "test_ended_at_utc": ended_at.isoformat(),
+              "test_started_at_utc": started_at.isoformat(),
           }
           output = Path(os.environ["RUN_DIR"]) / "metadata.json"
           output.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
@@ -208,6 +335,29 @@ jobs:
           print("No configured credentials or bearer-token patterns found in report files.")
           PY
 
+      - name: Build sanitized Pages bundle
+        id: pages
+        if: >-
+          ${{ always() &&
+              steps.load.outputs.run_dir != '' &&
+              steps.grafana.outcome == 'success' &&
+              steps.sensitive.outcome == 'success' }}
+        env:
+          RUN_DIR: ${{ steps.load.outputs.run_dir }}
+        run: |
+          set -euo pipefail
+
+          bundle_dir="$RUNNER_TEMP/pages-bundle"
+          uv run --locked --no-sync python scripts/build-load-report-site.py bundle \
+            --run-dir "$RUN_DIR" \
+            --output-dir "$bundle_dir"
+
+          run_key="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${GITHUB_SHA::7}"
+          artifact_name="pages-bundle-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          echo "run_key=$run_key" >> "$GITHUB_OUTPUT"
+
       - name: Upload Locust report
         if: >-
           ${{ always() &&
@@ -220,6 +370,15 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      - name: Upload sanitized Pages bundle
+        if: ${{ always() && steps.pages.outputs.ready == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.pages.outputs.artifact_name }}
+          path: ${{ runner.temp }}/pages-bundle
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Write run summary
         if: ${{ always() }}
         env:
@@ -227,7 +386,9 @@ jobs:
           RUN_NOTE: ${{ inputs.run_note }}
           LOAD_TEST_ENVIRONMENT: ${{ vars.LOAD_TEST_ENVIRONMENT }}
           LOAD_OUTCOME: ${{ steps.load.outcome }}
+          GRAFANA_OUTCOME: ${{ steps.grafana.outcome }}
           REPORT_SCAN_OUTCOME: ${{ steps.sensitive.outcome }}
+          PAGES_BUNDLE_OUTCOME: ${{ steps.pages.outcome }}
         run: |
           {
             echo "## EC2 load test"
@@ -237,7 +398,102 @@ jobs:
             echo "- Runner: \`$RUNNER_NAME\`"
             echo "- Commit: \`$GITHUB_SHA\`"
             echo "- Load-test result: \`${LOAD_OUTCOME:-not-run}\`"
+            echo "- Grafana screenshots: \`${GRAFANA_OUTCOME:-not-run}\`"
             echo "- Report safety scan: \`${REPORT_SCAN_OUTCOME:-not-run}\`"
+            echo "- Pages bundle: \`${PAGES_BUNDLE_OUTCOME:-not-run}\`"
             echo "- Artifact retention: 90 days"
             echo "- Run note: $RUN_NOTE"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish-report:
+    name: Publish performance report
+    needs: load-test
+    if: ${{ always() && needs.load-test.outputs.pages_ready == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Check out report history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          path: site
+
+      - name: Preserve site builder
+        run: cp site/scripts/build-load-report-site.py "$RUNNER_TEMP/build-load-report-site.py"
+
+      - name: Download sanitized report bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ needs.load-test.outputs.pages_artifact }}
+          path: incoming
+
+      - name: Update report history
+        env:
+          RUN_KEY: ${{ needs.load-test.outputs.run_key }}
+        run: |
+          set -euo pipefail
+
+          cd site
+          if git ls-remote --exit-code --heads origin performance-reports >/dev/null; then
+            git fetch origin performance-reports
+            git switch --force-create performance-reports origin/performance-reports
+          else
+            git switch --orphan performance-reports
+            git rm --recursive --force --ignore-unmatch .
+            git clean -dffx
+          fi
+
+          python3 "$RUNNER_TEMP/build-load-report-site.py" merge \
+            --bundle-dir "$GITHUB_WORKSPACE/incoming" \
+            --site-dir "$GITHUB_WORKSPACE/site"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "reports: publish load-test run $RUN_KEY"
+          git push origin performance-reports
+
+      - name: Export static site
+        run: |
+          mkdir -p "$RUNNER_TEMP/pages-site"
+          git -C site archive HEAD | tar -x -C "$RUNNER_TEMP/pages-site"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: ${{ runner.temp }}/pages-site
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+
+      - name: Write publication summary
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          RUN_KEY: ${{ needs.load-test.outputs.run_key }}
+        run: |
+          base_url="${PAGE_URL%/}"
+          run_url="$base_url/runs/$RUN_KEY"
+          {
+            echo "## Published performance report"
+            echo
+            echo "- [Run report]($run_url/index.html)"
+            echo "- [Locust HTML report]($run_url/report.html)"
+            echo "- [Complete report history]($base_url/index.html)"
+            echo
+            echo "### Application metrics"
+            echo "![Grafana application dashboard]($run_url/grafana-application.png)"
+            echo
+            echo "### Infrastructure metrics"
+            echo "![Grafana infrastructure dashboard]($run_url/grafana-infrastructure.png)"
           } >> "$GITHUB_STEP_SUMMARY"
