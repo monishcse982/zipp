@@ -80,25 +80,119 @@ jobs:
 
   image:
     name: Docker image
+    needs: [frontend, python, helm, secrets]
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      API_IMAGE: ghcr.io/${{ github.repository_owner }}/zipp-api
+      UI_IMAGE: ghcr.io/${{ github.repository_owner }}/zipp-ui
+      VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || 'http://localhost:8080' }}
+      VITE_COGNITO_ISSUER: ${{ vars.VITE_COGNITO_ISSUER || 'https://cognito-idp.example.com/example' }}
+      VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID || 'ci-public-client' }}
+      VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN || 'https://login.example.com' }}
+      VITE_COGNITO_REDIRECT_URI: ${{ vars.VITE_COGNITO_REDIRECT_URI || 'http://localhost:5173/auth/callback' }}
+      VITE_COGNITO_LOGOUT_URI: ${{ vars.VITE_COGNITO_LOGOUT_URI || 'http://localhost:5173/' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Build application image
-        run: docker build --tag zipp:ci .
-      - name: Build static UI image
+
+      - name: Validate published UI configuration
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        env:
+          PUBLISH_VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          PUBLISH_VITE_COGNITO_ISSUER: ${{ vars.VITE_COGNITO_ISSUER }}
+          PUBLISH_VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
+          PUBLISH_VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN }}
+          PUBLISH_VITE_COGNITO_REDIRECT_URI: ${{ vars.VITE_COGNITO_REDIRECT_URI }}
+          PUBLISH_VITE_COGNITO_LOGOUT_URI: ${{ vars.VITE_COGNITO_LOGOUT_URI }}
         run: |
-          docker build --tag zipp-ui:ci \
-            --build-arg VITE_API_BASE_URL=http://localhost:8080 \
-            --build-arg VITE_COGNITO_ISSUER=https://cognito-idp.example.com/example \
-            --build-arg VITE_COGNITO_CLIENT_ID=ci-public-client \
-            --build-arg VITE_COGNITO_DOMAIN=https://login.example.com \
-            --build-arg VITE_COGNITO_REDIRECT_URI=http://localhost:5173/auth/callback \
-            --build-arg VITE_COGNITO_LOGOUT_URI=http://localhost:5173/ \
-            frontend
+          set -euo pipefail
+
+          missing=()
+          for name in \
+            PUBLISH_VITE_API_BASE_URL \
+            PUBLISH_VITE_COGNITO_ISSUER \
+            PUBLISH_VITE_COGNITO_CLIENT_ID \
+            PUBLISH_VITE_COGNITO_DOMAIN \
+            PUBLISH_VITE_COGNITO_REDIRECT_URI \
+            PUBLISH_VITE_COGNITO_LOGOUT_URI
+          do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("${name#PUBLISH_}")
+            fi
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing repository variable: %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and optionally publish API image
+        id: api-image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+          tags: ${{ env.API_IMAGE }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=Zipp API
+          cache-from: type=gha,scope=zipp-api
+          cache-to: type=gha,mode=max,scope=zipp-api
+
+      - name: Build and optionally publish UI image
+        id: ui-image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: frontend
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+          tags: ${{ env.UI_IMAGE }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=Zipp UI
+          build-args: |
+            VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }}
+            VITE_COGNITO_ISSUER=${{ env.VITE_COGNITO_ISSUER }}
+            VITE_COGNITO_CLIENT_ID=${{ env.VITE_COGNITO_CLIENT_ID }}
+            VITE_COGNITO_DOMAIN=${{ env.VITE_COGNITO_DOMAIN }}
+            VITE_COGNITO_REDIRECT_URI=${{ env.VITE_COGNITO_REDIRECT_URI }}
+            VITE_COGNITO_LOGOUT_URI=${{ env.VITE_COGNITO_LOGOUT_URI }}
+          cache-from: type=gha,scope=zipp-ui
+          cache-to: type=gha,mode=max,scope=zipp-ui
+
+      - name: Write published image summary
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        env:
+          API_DIGEST: ${{ steps.api-image.outputs.digest }}
+          UI_DIGEST: ${{ steps.ui-image.outputs.digest }}
+        run: |
+          {
+            echo "## Published container images"
+            echo
+            echo "- API: \`$API_IMAGE:$GITHUB_SHA\`"
+            echo "- API digest: \`$API_DIGEST\`"
+            echo "- UI: \`$UI_IMAGE:$GITHUB_SHA\`"
+            echo "- UI digest: \`$UI_DIGEST\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   secrets:
     name: Secret scan
