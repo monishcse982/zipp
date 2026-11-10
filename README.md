@@ -521,11 +521,53 @@ Pull requests and pushes run the checks in
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml): locked Python dependency
 installation, Ruff lint and formatting, unit tests, Helm lint and rendering,
 Docker image build, and secret scans of committed files and Git history. The
-workflow has read-only repository permissions and does not deploy. To prevent
-merges when a check fails, require these job checks in the GitHub branch
-protection settings for `master`.
+workflow keeps repository contents read-only. Only the image job receives
+`packages: write`, and only a successful `master` push publishes images. The
+workflow does not deploy Kubernetes resources. To prevent merges when a check
+fails, require these job checks in the GitHub branch protection settings for
+`master`.
 
-The CI image job builds the API and frontend images but does not publish them.
+The CI image job builds both application images on pull requests and publishes
+them only after a successful push to `master`.
+
+### GitHub Container Registry images
+
+Pull requests build both container images after the quality and security jobs
+pass, but they do not publish them. A successful push to `master` publishes
+immutable images tagged with the full Git commit SHA:
+
+```text
+ghcr.io/monishcse982/zipp-api:<commit-sha>
+ghcr.io/monishcse982/zipp-ui:<commit-sha>
+```
+
+The UI build requires these GitHub repository variables:
+
+```text
+VITE_API_BASE_URL
+VITE_COGNITO_ISSUER
+VITE_COGNITO_CLIENT_ID
+VITE_COGNITO_DOMAIN
+VITE_COGNITO_REDIRECT_URI
+VITE_COGNITO_LOGOUT_URI
+```
+
+These values are browser-visible configuration, not secrets. The workflow
+fails before publishing if any value is missing. After their first publication,
+make the `zipp-api` and `zipp-ui` GHCR packages public so K3s can pull them
+without a registry credential.
+
+Deploy the complete stack to the externally managed EC2 K3s context with the
+exact SHA published by GitHub Actions:
+
+```bash
+make ec2-up IMAGE_TAG='<full-40-character-git-sha>'
+```
+
+This target verifies the `default` Kubernetes context, uses the `local-path`
+storage class, installs or upgrades infrastructure, and deploys the API and UI
+with `IfNotPresent` pull policies. It does not start Minikube, build images, or
+import images into K3s.
 
 Run Ruff checks:
 

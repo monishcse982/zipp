@@ -3,14 +3,19 @@ SHELL := /bin/bash
 .NOTPARALLEL:
 
 PROFILE ?= minikube
+CLUSTER_RUNTIME ?= minikube
 NAMESPACE ?= zipp
 INFRA_NAMESPACE ?= zipp-infra
 RELEASE ?= zipp-app
 INFRA_RELEASE ?= zipp-infra
 IMAGE ?= zipp
 IMAGE_TAG ?= local
+IMAGE_PULL_POLICY ?= Never
 FRONTEND_IMAGE ?= zipp-ui
 FRONTEND_IMAGE_TAG ?= local
+FRONTEND_IMAGE_PULL_POLICY ?= $(IMAGE_PULL_POLICY)
+GHCR_NAMESPACE ?= ghcr.io/monishcse982
+EC2_PROFILE ?= default
 ENV_FILE ?= .env.kubernetes
 LOCAL_PORT ?= $(or $(shell awk -F= '$$1 == "APP_PORT" { print $$2; exit }' $(ENV_FILE) 2>/dev/null),8000)
 POSTGRES_LOCAL_PORT ?= 5433
@@ -49,9 +54,9 @@ PROMETHEUS_SERVICE := $(MONITORING_RELEASE)-kube-prometheus-prometheus
 GRAFANA_PORT ?= 3000
 PROMETHEUS_PORT ?= 9090
 PORT_FORWARD_FRONTEND ?= 1
-APP_HELM_IMAGE_ARGS = --set-string image.repository=$(IMAGE) --set-string image.tag=$(IMAGE_TAG) --set-string frontend.image.repository=$(FRONTEND_IMAGE) --set-string frontend.image.tag=$(FRONTEND_IMAGE_TAG)
+APP_HELM_IMAGE_ARGS = --set-string image.repository=$(IMAGE) --set-string image.tag=$(IMAGE_TAG) --set-string image.pullPolicy=$(IMAGE_PULL_POLICY) --set-string frontend.image.repository=$(FRONTEND_IMAGE) --set-string frontend.image.tag=$(FRONTEND_IMAGE_TAG) --set-string frontend.image.pullPolicy=$(FRONTEND_IMAGE_PULL_POLICY)
 
-.PHONY: help unit-test coverage app-up app-start app-redeploy frontend-deps frontend-env-check infra-up infra-start infra-stop infra-status cluster-up cluster-stop cluster-status image-build image-load validate-env namespace infra-namespace secret postgres-secret valkey-secret kafka-operator monitoring-install monitoring-status grafana-password postgres-password valkey-password kafka-password prometheus-password grafana-forward prometheus-forward chart-deps chart-validate deploy deploy-infra deploy-app wait-infra wait-app sync-kafka-password infra-ready migration-status status logs port-forward port-forward-app port-forward-all diagnose-port-forward restart uninstall cluster-delete makemigrations migrate
+.PHONY: help unit-test coverage app-up app-start app-redeploy ec2-up frontend-deps frontend-env-check infra-up infra-start infra-stop infra-status cluster-up cluster-stop cluster-status image-build image-load validate-env namespace infra-namespace secret postgres-secret valkey-secret kafka-operator monitoring-install monitoring-status grafana-password postgres-password valkey-password kafka-password prometheus-password grafana-forward prometheus-forward chart-deps chart-validate deploy deploy-infra deploy-app wait-infra wait-app sync-kafka-password infra-ready migration-status status logs port-forward port-forward-app port-forward-all diagnose-port-forward restart uninstall cluster-delete makemigrations migrate
 
 help: ## Show the available commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target> [VARIABLE=value]\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -62,6 +67,7 @@ help: ## Show the available commands.
 	@printf "  First setup:   make app-up\n"
 	@printf "  Resume stack:  make app-start\n"
 	@printf "  Code change:   make app-redeploy\n"
+	@printf "  EC2 deploy:    make ec2-up IMAGE_TAG=<full-git-sha>\n"
 	@printf "  Full checks:   make chart-validate coverage\n"
 	@printf "  Stop safely:   make infra-stop\n"
 	@printf "  EC2 K3s reset: ./scripts/reset-ec2-k3s.sh --confirm --context default\n"
@@ -83,6 +89,19 @@ app-start: frontend-env-check infra-start ## Resume an existing Minikube stack a
 app-redeploy: frontend-env-check image-load wait-app ## Rebuild, load, and deploy application images without reinstalling the stack.
 	$(MAKE) port-forward-all
 
+ec2-up: ## Deploy the complete K3s stack from immutable GHCR images.
+	@if [[ ! "$(IMAGE_TAG)" =~ ^[0-9a-f]{40}$$ ]]; then echo "IMAGE_TAG must be the full 40-character Git commit SHA"; exit 1; fi
+	$(MAKE) infra-ready \
+		CLUSTER_RUNTIME=external \
+		PROFILE=$(EC2_PROFILE) \
+		PROMETHEUS_STORAGE_CLASS=local-path \
+		IMAGE=$(GHCR_NAMESPACE)/zipp-api \
+		IMAGE_TAG=$(IMAGE_TAG) \
+		IMAGE_PULL_POLICY=IfNotPresent \
+		FRONTEND_IMAGE=$(GHCR_NAMESPACE)/zipp-ui \
+		FRONTEND_IMAGE_TAG=$(IMAGE_TAG) \
+		FRONTEND_IMAGE_PULL_POLICY=IfNotPresent
+
 frontend-deps: ## Install locked frontend dependencies if they are missing.
 	@test -d frontend/node_modules || npm --prefix frontend ci
 
@@ -97,9 +116,16 @@ infra-stop: cluster-stop ## Stop Minikube while preserving cluster data.
 
 infra-status: cluster-status status monitoring-status ## Show Minikube, Helm, and Kubernetes status.
 
-cluster-up: ## Create or start the Minikube profile.
-	minikube start --profile $(PROFILE) --driver $(MINIKUBE_DRIVER) --cpus $(MINIKUBE_CPUS) --memory $(MINIKUBE_MEMORY) --disk-size $(MINIKUBE_DISK_SIZE)
-	minikube update-context --profile $(PROFILE)
+cluster-up: ## Start Minikube or verify an externally managed Kubernetes context.
+	@if [ "$(CLUSTER_RUNTIME)" = "external" ]; then \
+		$(KUBECTL) get nodes -o wide; \
+	elif [ "$(CLUSTER_RUNTIME)" = "minikube" ]; then \
+		minikube start --profile $(PROFILE) --driver $(MINIKUBE_DRIVER) --cpus $(MINIKUBE_CPUS) --memory $(MINIKUBE_MEMORY) --disk-size $(MINIKUBE_DISK_SIZE); \
+		minikube update-context --profile $(PROFILE); \
+	else \
+		echo "Unsupported CLUSTER_RUNTIME: $(CLUSTER_RUNTIME) (expected minikube or external)"; \
+		exit 1; \
+	fi
 
 cluster-stop: ## Stop the Minikube profile without deleting it.
 	minikube stop --profile $(PROFILE)
