@@ -1,0 +1,243 @@
+name: Run load test
+
+on:
+  workflow_dispatch:
+    inputs:
+      preset:
+        description: Version-controlled load-test preset
+        required: true
+        type: choice
+        default: mixed_redirect_constant_user_100user_5minutes
+        options:
+          - management_api_constant_user_50user_10minutes
+          - mixed_redirect_burst_recovery_250user_6m30s
+          - mixed_redirect_constant_user_100user_5minutes
+          - mixed_redirect_ramp_up_down_spike_250user_10minutes
+          - mixed_redirect_soak_50user_60minutes
+          - mixed_redirect_spike_user_200user_20minutes
+          - mixed_redirect_spike_user_200user_5minutes
+          - mixed_redirect_step_user_250user_5minutes
+          - write_heavy_constant_user_50user_10minutes
+      run_note:
+        description: Reason for this load-test run
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zipp-load-test-ec2
+  cancel-in-progress: false
+
+jobs:
+  load-test:
+    name: Run ${{ inputs.preset }}
+    runs-on: [self-hosted, linux, x64, zipp-load]
+    timeout-minutes: 90
+    environment: load-test-ec2
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.12.17"
+          enable-cache: true
+
+      - name: Install Python and locked load-test dependencies
+        run: |
+          uv python install 3.12
+          uv sync --locked --group dev --python 3.12
+
+      - name: Validate selected preset
+        env:
+          PRESET: ${{ inputs.preset }}
+        run: |
+          set -euo pipefail
+
+          available_presets="$(tests/load/run-load-test.sh --list)"
+          if ! grep --fixed-strings --line-regexp --quiet "$PRESET" <<< "$available_presets"; then
+            echo "Preset is not available in tests/load/presets: $PRESET" >&2
+            exit 1
+          fi
+
+      - name: Verify API liveness and readiness
+        env:
+          LOAD_TEST_BASE_URL: ${{ vars.LOAD_TEST_BASE_URL }}
+          LOAD_TEST_ENVIRONMENT: ${{ vars.LOAD_TEST_ENVIRONMENT }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${LOAD_TEST_BASE_URL:-}" ]]; then
+            echo "LOAD_TEST_BASE_URL is not configured" >&2
+            exit 1
+          fi
+
+          base_url="${LOAD_TEST_BASE_URL%/}"
+          echo "Environment: ${LOAD_TEST_ENVIRONMENT:-not-set}"
+          echo "Target: $base_url"
+
+          curl --fail --silent --show-error --max-time 10 \
+            "$base_url/health/live" \
+            --output "$RUNNER_TEMP/zipp-live.json"
+          curl --fail --silent --show-error --max-time 10 \
+            "$base_url/health/ready" \
+            --output "$RUNNER_TEMP/zipp-ready.json"
+
+          echo "Liveness response:"
+          python3 -m json.tool "$RUNNER_TEMP/zipp-live.json"
+          echo "Readiness response:"
+          python3 -m json.tool "$RUNNER_TEMP/zipp-ready.json"
+
+      - name: Run Locust
+        id: load
+        env:
+          PRESET: ${{ inputs.preset }}
+          LOAD_TEST_BASE_URL: ${{ vars.LOAD_TEST_BASE_URL }}
+          COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID }}
+          COGNITO_API_USERNAME: ${{ secrets.COGNITO_API_USERNAME }}
+          COGNITO_API_PASSWORD: ${{ secrets.COGNITO_API_PASSWORD }}
+        run: |
+          set -uo pipefail
+
+          touch "$RUNNER_TEMP/load-test-start"
+          tests/load/run-load-test.sh "$PRESET" \
+            --base-url "$LOAD_TEST_BASE_URL"
+          load_exit_code=$?
+
+          run_dir="$(
+            find "reports/load/$PRESET" \
+              -mindepth 1 \
+              -maxdepth 1 \
+              -type d \
+              -newer "$RUNNER_TEMP/load-test-start" \
+              -print 2>/dev/null \
+              | sort \
+              | tail -n 1
+          )"
+
+          if [[ -z "$run_dir" ]]; then
+            echo "The load test did not create a report directory" >&2
+            exit "${load_exit_code:-1}"
+          fi
+
+          echo "run_dir=$run_dir" >> "$GITHUB_OUTPUT"
+          exit "$load_exit_code"
+
+      - name: Write sanitized run metadata
+        if: ${{ always() && steps.load.outputs.run_dir != '' }}
+        env:
+          RUN_DIR: ${{ steps.load.outputs.run_dir }}
+          PRESET: ${{ inputs.preset }}
+          RUN_NOTE: ${{ inputs.run_note }}
+          LOAD_TEST_ENVIRONMENT: ${{ vars.LOAD_TEST_ENVIRONMENT }}
+        run: |
+          uv run --locked --no-sync python - <<'PY'
+          import json
+          import os
+          from datetime import UTC, datetime
+          from pathlib import Path
+
+          metadata = {
+              "commit_sha": os.environ["GITHUB_SHA"],
+              "environment": os.environ.get("LOAD_TEST_ENVIRONMENT", "not-set"),
+              "github_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "github_run_id": os.environ["GITHUB_RUN_ID"],
+              "github_run_url": (
+                  f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}"
+                  f"/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+              ),
+              "preset": os.environ["PRESET"],
+              "recorded_at_utc": datetime.now(UTC).isoformat(),
+              "run_note": os.environ["RUN_NOTE"],
+              "runner_name": os.environ["RUNNER_NAME"],
+          }
+          output = Path(os.environ["RUN_DIR"]) / "metadata.json"
+          output.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+          PY
+
+      - name: Check report for sensitive values
+        id: sensitive
+        if: ${{ always() && steps.load.outputs.run_dir != '' }}
+        env:
+          RUN_DIR: ${{ steps.load.outputs.run_dir }}
+          COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID }}
+          COGNITO_API_USERNAME: ${{ secrets.COGNITO_API_USERNAME }}
+          COGNITO_API_PASSWORD: ${{ secrets.COGNITO_API_PASSWORD }}
+        run: |
+          uv run --locked --no-sync python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          root = Path(os.environ["RUN_DIR"])
+          secret_values = {
+              value
+              for name in (
+                  "COGNITO_CLIENT_ID",
+                  "COGNITO_API_USERNAME",
+                  "COGNITO_API_PASSWORD",
+              )
+              if (value := os.environ.get(name, ""))
+          }
+          token_patterns = (
+              re.compile(r"Authorization:\s*Bearer\s+\S+", re.IGNORECASE),
+              re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"),
+          )
+
+          findings: list[str] = []
+          for path in root.rglob("*"):
+              if not path.is_file():
+                  continue
+              text = path.read_text(encoding="utf-8", errors="ignore")
+              if any(value in text for value in secret_values):
+                  findings.append(f"configured credential in {path.name}")
+              if any(pattern.search(text) for pattern in token_patterns):
+                  findings.append(f"token-like value in {path.name}")
+
+          if findings:
+              for finding in sorted(set(findings)):
+                  print(f"Sensitive report content detected: {finding}")
+              raise SystemExit("Report upload blocked")
+
+          print("No configured credentials or bearer-token patterns found in report files.")
+          PY
+
+      - name: Upload Locust report
+        if: >-
+          ${{ always() &&
+              steps.load.outputs.run_dir != '' &&
+              steps.sensitive.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: locust-${{ inputs.preset }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.load.outputs.run_dir }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Write run summary
+        if: ${{ always() }}
+        env:
+          PRESET: ${{ inputs.preset }}
+          RUN_NOTE: ${{ inputs.run_note }}
+          LOAD_TEST_ENVIRONMENT: ${{ vars.LOAD_TEST_ENVIRONMENT }}
+          LOAD_OUTCOME: ${{ steps.load.outcome }}
+          REPORT_SCAN_OUTCOME: ${{ steps.sensitive.outcome }}
+        run: |
+          {
+            echo "## EC2 load test"
+            echo
+            echo "- Preset: \`$PRESET\`"
+            echo "- Environment: \`${LOAD_TEST_ENVIRONMENT:-not-set}\`"
+            echo "- Runner: \`$RUNNER_NAME\`"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Load-test result: \`${LOAD_OUTCOME:-not-run}\`"
+            echo "- Report safety scan: \`${REPORT_SCAN_OUTCOME:-not-run}\`"
+            echo "- Artifact retention: 90 days"
+            echo "- Run note: $RUN_NOTE"
+          } >> "$GITHUB_STEP_SUMMARY"
