@@ -1,0 +1,114 @@
+name: Load-test preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zipp-load-test-ec2
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Verify EC2 load-test prerequisites
+    runs-on: [self-hosted, linux, x64, zipp-load]
+    timeout-minutes: 10
+    environment: load-test-ec2
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.12.17"
+          enable-cache: true
+
+      - name: Install Python and locked load-test dependencies
+        run: |
+          uv python install 3.12
+          uv sync --locked --group dev --python 3.12
+
+      - name: Verify API liveness and readiness
+        env:
+          LOAD_TEST_BASE_URL: ${{ vars.LOAD_TEST_BASE_URL }}
+          LOAD_TEST_ENVIRONMENT: ${{ vars.LOAD_TEST_ENVIRONMENT }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${LOAD_TEST_BASE_URL:-}" ]]; then
+            echo "LOAD_TEST_BASE_URL is not configured" >&2
+            exit 1
+          fi
+
+          base_url="${LOAD_TEST_BASE_URL%/}"
+          echo "Environment: ${LOAD_TEST_ENVIRONMENT:-not-set}"
+          echo "Target: $base_url"
+
+          curl --fail --silent --show-error --max-time 10 \
+            "$base_url/health/live" \
+            --output "$RUNNER_TEMP/zipp-live.json"
+          curl --fail --silent --show-error --max-time 10 \
+            "$base_url/health/ready" \
+            --output "$RUNNER_TEMP/zipp-ready.json"
+
+          echo "Liveness response:"
+          python3 -m json.tool "$RUNNER_TEMP/zipp-live.json"
+          echo "Readiness response:"
+          python3 -m json.tool "$RUNNER_TEMP/zipp-ready.json"
+
+      - name: Verify Cognito authentication
+        env:
+          COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID }}
+          COGNITO_API_USERNAME: ${{ secrets.COGNITO_API_USERNAME }}
+          COGNITO_API_PASSWORD: ${{ secrets.COGNITO_API_PASSWORD }}
+        run: |
+          uv run --locked --no-sync python - <<'PY'
+          import os
+
+          from tests.load.scenarios.helpers.api_client import ZippApiClient
+
+          required = (
+              "COGNITO_CLIENT_ID",
+              "COGNITO_API_USERNAME",
+              "COGNITO_API_PASSWORD",
+          )
+          missing = [name for name in required if not os.environ.get(name, "").strip()]
+          if missing:
+              raise RuntimeError(
+                  "Missing GitHub environment secrets: " + ", ".join(missing)
+              )
+
+          client = ZippApiClient(
+              http_client=None,
+              base_url="",
+              client_id=os.environ["COGNITO_CLIENT_ID"],
+              username=os.environ["COGNITO_API_USERNAME"],
+              password=os.environ["COGNITO_API_PASSWORD"],
+          )
+          if not client.login():
+              raise RuntimeError("Cognito authentication returned no access token")
+
+          print("Cognito authentication succeeded; token value was not printed.")
+          PY
+
+      - name: Write preflight summary
+        env:
+          LOAD_TEST_ENVIRONMENT: ${{ vars.LOAD_TEST_ENVIRONMENT }}
+        run: |
+          {
+            echo "## Load-test preflight"
+            echo
+            echo "- Runner: \`$RUNNER_NAME\`"
+            echo "- Environment: \`${LOAD_TEST_ENVIRONMENT:-not-set}\`"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- API liveness: passed"
+            echo "- API readiness: passed"
+            echo "- Cognito authentication: passed"
+            echo "- Load generated: none"
+          } >> "$GITHUB_STEP_SUMMARY"
