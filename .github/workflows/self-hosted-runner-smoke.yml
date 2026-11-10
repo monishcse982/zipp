@@ -9,7 +9,7 @@ permissions:
 jobs:
   smoke:
     name: Verify EC2 runner
-    runs-on: [self-hosted, linux, x64, zipp-load]
+    runs-on: [ self-hosted, linux, x64, zipp-load ]
     timeout-minutes: 5
 
     steps:
