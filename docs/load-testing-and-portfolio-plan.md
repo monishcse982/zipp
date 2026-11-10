@@ -139,13 +139,6 @@ requests.
    inspection and dashboard access, not for normal test execution.
 8. Stop the EC2 instance after testing to avoid unnecessary compute cost.
 
-### Deferred: EKS showcase path
-
-EKS and GitHub-hosted runners are intentionally out of scope for the current
-phase. A GitHub-hosted runner cannot reach the private EC2/k3s network without
-additional networking. Revisit that design after the self-hosted runner
-workflow is stable.
-
 ## Git history and resume evidence
 
 Use small, outcome-focused commits and pull requests. Suggested sequence:
@@ -156,7 +149,6 @@ Use small, outcome-focused commits and pull requests. Suggested sequence:
 4. `test(load): add read-heavy and management-api scenarios`
 5. `ci(performance): publish load-test reports as workflow artifacts`
 6. `docs(performance): document baseline and capacity findings`
-7. `feat(platform): deploy zipp performance environment to eks`
 
 Each pull request should include:
 
@@ -168,8 +160,8 @@ Each pull request should include:
 - known limitations
 - a link to the generated report
 
-This creates a visible progression from instrumentation, to testing, to
-observability, to deployment automation.
+This creates a visible progression from instrumentation, to testing, and to
+observability.
 
 ## Definition of done
 

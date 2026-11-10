@@ -2,7 +2,7 @@
 
 A FastAPI URL shortener built as a small event-driven system. It creates short links, redirects visitors, publishes visit events to Kafka, and persists visit details asynchronously in PostgreSQL. The repository also includes local Kubernetes deployment, Prometheus/Grafana observability, and repeatable Locust load profiles.
 
-**Project status:** the current local application scope is complete. EKS hosting is deferred as a separate learning exercise. See [the project status and deferred roadmap](docs/roadmap.md).
+**Project status:** the current application scope is complete. See [the project status and deferred roadmap](docs/roadmap.md).
 
 ## Current Capabilities
 
@@ -512,9 +512,6 @@ merges when a check fails, require these job checks in the GitHub branch
 protection settings for `master`.
 
 The CI image job builds the API and frontend images but does not publish them.
-The project owner has completed ECR publication outside this repository; the
-[EKS learning plan](docs/eks-learning-plan.md) tracks the image references and
-deployment steps that still need to be recorded.
 
 Run Ruff checks:
 
@@ -656,4 +653,4 @@ and rotate it before publishing; adding it to `.gitignore` later is not enough.
 
 ## Project Status
 
-The application, Cognito management flow, and API load-testing scope are complete for local use. The repository's GitHub Actions workflow runs checks and builds images; it does not publish images to ECR or deploy to EKS. EKS is deferred. Optional reliability and browser end-to-end learning exercises are listed in [docs/roadmap.md](docs/roadmap.md).
+The application, Cognito management flow, and API load-testing scope are complete. The repository's GitHub Actions workflow runs checks and builds images without publishing them. Optional reliability and browser end-to-end learning exercises are listed in [docs/roadmap.md](docs/roadmap.md).

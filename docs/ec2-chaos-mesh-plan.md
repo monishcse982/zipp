@@ -8,10 +8,8 @@ environment. Do not migrate the Minikube database or try to preserve its data.
 
 The first pass uses one EC2 instance running a single-node K3s cluster. K3s is a
 small Kubernetes distribution that can run a complete single-node cluster. This
-keeps the exercise focused on Kubernetes and Chaos Mesh without the EKS control
-plane and multi-node setup. It does not provide high availability: if the EC2
-host fails, the whole cluster is unavailable. If the learning goal changes to
-EKS, use the separate [EKS learning plan](eks-learning-plan.md).
+keeps the exercise focused on Kubernetes and Chaos Mesh. It does not provide
+high availability: if the EC2 host fails, the whole cluster is unavailable.
 
 ## Target layout
 
@@ -97,6 +95,32 @@ test PVC binds using the selected StorageClass.
 
 **Done when:** create, visit, and disable flows work, visit events persist, and
 the Zipp dashboard shows application metrics.
+
+### Repeat a clean K3s deployment
+
+On the EC2 host, from the checked-out repository, run:
+
+```bash
+./scripts/reset-ec2-k3s.sh --confirm --context default
+```
+
+The script checks that the selected context is the **local, single-node K3s**
+cluster and that the environment files, Docker, Helm dependencies, and
+`local-path` StorageClass are ready before removing anything. It builds and
+imports new API/UI images, deletes the three Zipp namespaces (including their
+Secrets and PVC data), and deploys the charts with K3s storage. It deletes
+Kafka topics while Strimzi is present and can recover from the known stuck
+topic-operator finalizer during an interrupted reset. It then checks the app
+rollouts, migration job, and Prometheus PVC and endpoint. The script requires
+passwordless `sudo` for `k3s ctr images import`.
+
+K3s itself, `kube-system`, and `chaos-mesh` stay installed. Stop active tests
+before resetting. After a successful run, restart the EC2 port-forwards and
+the Mac SSH tunnel if needed:
+
+```bash
+make port-forward-all PROFILE=default
+```
 
 ### 4. Install Chaos Mesh
 
