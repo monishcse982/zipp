@@ -43,6 +43,7 @@ KAFKA_USER := zipp-user
 MONITORING_NAMESPACE ?= zipp-observability
 MONITORING_RELEASE ?= monitoring
 SCRAPE_INTERVAL ?= 15s
+PROMETHEUS_STORAGE_CLASS ?= standard
 GRAFANA_SERVICE := $(MONITORING_RELEASE)-grafana
 PROMETHEUS_SERVICE := $(MONITORING_RELEASE)-kube-prometheus-prometheus
 GRAFANA_PORT ?= 3000
@@ -56,12 +57,14 @@ help: ## Show the available commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target> [VARIABLE=value]\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@printf "\nCommon overrides:\n"
 	@printf "  PROFILE=%s NAMESPACE=%s INFRA_NAMESPACE=%s ENV_FILE=%s LOCAL_PORT=%s\n" "$(PROFILE)" "$(NAMESPACE)" "$(INFRA_NAMESPACE)" "$(ENV_FILE)" "$(LOCAL_PORT)"
+	@printf "  PROMETHEUS_STORAGE_CLASS=%s (use local-path on K3s)\n" "$(PROMETHEUS_STORAGE_CLASS)"
 	@printf "\nSuggested workflows:\n"
 	@printf "  First setup:   make app-up\n"
 	@printf "  Resume stack:  make app-start\n"
 	@printf "  Code change:   make app-redeploy\n"
 	@printf "  Full checks:   make chart-validate coverage\n"
 	@printf "  Stop safely:   make infra-stop\n"
+	@printf "  EC2 K3s reset: ./scripts/reset-ec2-k3s.sh --confirm --context default\n"
 
 unit-test: ## Run unit tests while collecting line and branch coverage.
 	uv run --locked coverage run -m unittest discover -s tests/unit -v
@@ -138,7 +141,7 @@ kafka-operator: infra-namespace ## Install or upgrade the Strimzi Kafka operator
 	helm upgrade --install $(STRIMZI_RELEASE) $(STRIMZI_CHART) $(HELM_CONTEXT) --version $(STRIMZI_VERSION) --namespace $(INFRA_NAMESPACE) --values $(STRIMZI_VALUES) --wait --timeout 10m
 
 monitoring-install: cluster-up ## Install or upgrade Prometheus and Grafana.
-	helm upgrade --install $(MONITORING_RELEASE) $(OBSERVABILITY_CHART) $(HELM_CONTEXT) --namespace $(MONITORING_NAMESPACE) --create-namespace --set kube-prometheus-stack.prometheus.prometheusSpec.scrapeInterval=$(SCRAPE_INTERVAL) --set kube-prometheus-stack.prometheus.prometheusSpec.evaluationInterval=$(SCRAPE_INTERVAL) --wait --timeout 15m
+	helm upgrade --install $(MONITORING_RELEASE) $(OBSERVABILITY_CHART) $(HELM_CONTEXT) --namespace $(MONITORING_NAMESPACE) --create-namespace --set kube-prometheus-stack.prometheus.prometheusSpec.scrapeInterval=$(SCRAPE_INTERVAL) --set kube-prometheus-stack.prometheus.prometheusSpec.evaluationInterval=$(SCRAPE_INTERVAL) --set-string kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=$(PROMETHEUS_STORAGE_CLASS) --wait --timeout 15m
 
 monitoring-status: ## Show Prometheus and Grafana resources.
 	helm list $(HELM_CONTEXT) --namespace $(MONITORING_NAMESPACE)
@@ -182,7 +185,7 @@ chart-validate: ## Build dependencies, lint all charts, and render all releases.
 	helm lint $(OBSERVABILITY_CHART)
 	helm template $(RELEASE) $(APP_CHART) $(HELM_CONTEXT) --namespace $(NAMESPACE) $(APP_HELM_IMAGE_ARGS) --set monitoring.serviceMonitor.interval=$(SCRAPE_INTERVAL) > $(RENDERED_APP_MANIFEST)
 	helm template $(INFRA_RELEASE) $(INFRA_CHART) $(HELM_CONTEXT) --namespace $(INFRA_NAMESPACE) --set valkey.metrics.serviceMonitor.interval=$(SCRAPE_INTERVAL) > $(RENDERED_INFRA_MANIFEST)
-	helm template $(MONITORING_RELEASE) $(OBSERVABILITY_CHART) $(HELM_CONTEXT) --namespace $(MONITORING_NAMESPACE) --set kube-prometheus-stack.prometheus.prometheusSpec.scrapeInterval=$(SCRAPE_INTERVAL) --set kube-prometheus-stack.prometheus.prometheusSpec.evaluationInterval=$(SCRAPE_INTERVAL) > $(RENDERED_OBSERVABILITY_MANIFEST)
+	helm template $(MONITORING_RELEASE) $(OBSERVABILITY_CHART) $(HELM_CONTEXT) --namespace $(MONITORING_NAMESPACE) --set kube-prometheus-stack.prometheus.prometheusSpec.scrapeInterval=$(SCRAPE_INTERVAL) --set kube-prometheus-stack.prometheus.prometheusSpec.evaluationInterval=$(SCRAPE_INTERVAL) --set-string kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=$(PROMETHEUS_STORAGE_CLASS) > $(RENDERED_OBSERVABILITY_MANIFEST)
 
 deploy-infra: postgres-secret valkey-secret kafka-operator monitoring-install ## Install or upgrade PostgreSQL, Valkey, Kafka, and observability.
 	helm upgrade --install $(INFRA_RELEASE) $(INFRA_CHART) $(HELM_CONTEXT) --namespace $(INFRA_NAMESPACE) --set valkey.metrics.serviceMonitor.interval=$(SCRAPE_INTERVAL) --timeout 5m

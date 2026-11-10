@@ -2,12 +2,24 @@
 set -eu
 
 repo_root=$(git rev-parse --show-toplevel)
-python3 "$repo_root/scripts/check-git-content.py" --pre-push
+
+if ! command -v ggshield >/dev/null 2>&1; then
+    printf 'ggshield is required to scan commits before pushing.\n' >&2
+    printf 'Install it and run: ggshield auth login\n' >&2
+    exit 1
+fi
 
 if ! command -v uv >/dev/null 2>&1; then
     printf 'uv is required to run unit tests before pushing.\n' >&2
     exit 1
 fi
+
+refs_file=$(mktemp "${TMPDIR:-/tmp}/zipp-pre-push.XXXXXX")
+trap 'rm -f "$refs_file"' EXIT HUP INT TERM
+cat >"$refs_file"
+
+python3 "$repo_root/scripts/check-git-content.py" --pre-push <"$refs_file"
+ggshield secret scan pre-push --no-check-for-updates "$@" <"$refs_file"
 
 cd "$repo_root"
 uv run --locked coverage run -m unittest discover -s tests/unit -v

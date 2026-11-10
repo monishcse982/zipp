@@ -1,0 +1,31 @@
+name: Self-hosted runner smoke test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Verify EC2 runner
+    runs-on: [ self-hosted, linux, x64, zipp-load ]
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify runner identity
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Runner: $RUNNER_NAME"
+          echo "OS: $RUNNER_OS"
+          echo "Architecture: $RUNNER_ARCH"
+          echo "User: $(whoami)"
+          echo "Host: $(hostname)"
+
+          test "$(whoami)" = "github-runner"
+          test "$HOME" = "/home/github-runner"
+
+      - name: Verify outbound connectivity
+        run: curl --fail --silent --show-error https://github.com >/dev/null

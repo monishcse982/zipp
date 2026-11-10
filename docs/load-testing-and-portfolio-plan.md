@@ -38,6 +38,15 @@ The current `mixed_redirect_traffic` scenario is a good general baseline. Add
 profiles that isolate different production behaviors rather than increasing
 load blindly.
 
+The first four runnable profiles are:
+
+| Test | Preset | Purpose |
+| --- | --- | --- |
+| Management API | `management_api_constant_user_50user_10minutes` | Read-heavy authenticated list and detail traffic with occasional mutations |
+| Write-heavy creation | `write_heavy_constant_user_50user_10minutes` | Sustained creation across policy, TTL, title, and visit-limit variants |
+| Burst and recovery | `mixed_redirect_burst_recovery_250user_6m30s` | Establish baseline, burst to 250 users, return to baseline, and observe recovery |
+| Soak | `mixed_redirect_soak_50user_60minutes` | Hold moderate mixed redirect traffic for one hour |
+
 ### Read-heavy redirect traffic
 
 - 95% public redirects
@@ -130,13 +139,6 @@ requests.
    inspection and dashboard access, not for normal test execution.
 8. Stop the EC2 instance after testing to avoid unnecessary compute cost.
 
-### Deferred: EKS showcase path
-
-EKS and GitHub-hosted runners are intentionally out of scope for the current
-phase. A GitHub-hosted runner cannot reach the private EC2/k3s network without
-additional networking. Revisit that design after the self-hosted runner
-workflow is stable.
-
 ## Git history and resume evidence
 
 Use small, outcome-focused commits and pull requests. Suggested sequence:
@@ -147,7 +149,6 @@ Use small, outcome-focused commits and pull requests. Suggested sequence:
 4. `test(load): add read-heavy and management-api scenarios`
 5. `ci(performance): publish load-test reports as workflow artifacts`
 6. `docs(performance): document baseline and capacity findings`
-7. `feat(platform): deploy zipp performance environment to eks`
 
 Each pull request should include:
 
@@ -159,8 +160,8 @@ Each pull request should include:
 - known limitations
 - a link to the generated report
 
-This creates a visible progression from instrumentation, to testing, to
-observability, to deployment automation.
+This creates a visible progression from instrumentation, to testing, and to
+observability.
 
 ## Definition of done
 
