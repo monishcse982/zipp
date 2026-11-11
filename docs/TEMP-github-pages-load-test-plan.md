@@ -125,9 +125,10 @@ Before Locust starts, the workflow must:
 6. Confirm sufficient free disk space for the report directory.
 7. Stop before generating load if any preflight check fails.
 
-The workflow does not start EC2, k3s, Kubernetes workloads, tunnels, or
-port-forwards. Those remain explicit manual prerequisites for this first
-version.
+The workflow does not start EC2, K3s, Kubernetes workloads, or the Mac SSH
+tunnel. EC2 localhost forwards are maintained by
+`zipp-port-forwards.service`; the workflow verifies them with bounded retries
+before generating load.
 
 ## Phase 5: Run the long test
 

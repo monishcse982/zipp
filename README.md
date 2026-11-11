@@ -469,8 +469,10 @@ The Kubernetes resource names use hyphens, while the Kafka topic names are `link
 ## Load Tests
 
 The scenarios default to `http://localhost:8080`, matching `APP_PORT` and the
-local application port-forward. Keep `make port-forward-all` running before
-starting a test; use `--base-url` to override the target when needed.
+local application port-forward. For Minikube, keep `make port-forward-all`
+running before starting a test. EC2 uses the persistent
+`zipp-port-forwards.service` described below. Use `--base-url` to override the
+target when needed.
 
 List presets:
 
@@ -563,6 +565,24 @@ exact SHA published by GitHub Actions:
 ```bash
 make ec2-up IMAGE_TAG='<full-40-character-git-sha>'
 ```
+
+`make ec2-up` also installs and enables `zipp-port-forwards.service`. The
+systemd service exposes the API, UI, Grafana, Prometheus, PostgreSQL, and Valkey
+only on the EC2 host's loopback interface. It starts after K3s, survives EC2
+reboots, and restarts all forwards when an application or Grafana health check
+detects a stale Kubernetes connection after a rollout.
+
+Manage the service with:
+
+```bash
+make ec2-forward-status
+make ec2-forward-restart
+make ec2-forward-logs
+```
+
+The first installation requires `sudo`. Stop any manually running
+`make port-forward-all` process before installation so it does not already own
+the local ports.
 
 This target verifies the `default` Kubernetes context, uses the `local-path`
 storage class, installs or upgrades infrastructure, and deploys the API and UI
