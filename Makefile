@@ -67,7 +67,8 @@ help: ## Show the available commands.
 	@printf "  First setup:   make app-up\n"
 	@printf "  Resume stack:  make app-start\n"
 	@printf "  Code change:   make app-redeploy\n"
-	@printf "  EC2 deploy:    make ec2-up IMAGE_TAG=<full-git-sha>\n"
+	@printf "  EC2 full stack: make ec2-up IMAGE_TAG=<full-git-sha>\n"
+	@printf "  EC2 app only:   make ec2-deploy-app IMAGE_TAG=<full-git-sha>\n"
 	@printf "  Full checks:   make chart-validate coverage\n"
 	@printf "  Stop safely:   make infra-stop\n"
 	@printf "  EC2 K3s reset: ./scripts/reset-ec2-k3s.sh --confirm --context default\n"
@@ -124,6 +125,8 @@ deploy-app-release: ## Upgrade only the existing application release and verify 
 		--namespace $(NAMESPACE) \
 		$(APP_HELM_IMAGE_ARGS) \
 		--set monitoring.serviceMonitor.interval=$(SCRAPE_INTERVAL) \
+		--atomic \
+		--wait \
 		--timeout 5m
 	$(KUBECTL) wait \
 		--namespace $(NAMESPACE) \

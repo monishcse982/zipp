@@ -80,9 +80,21 @@ jobs:
       - name: Build locked dependencies, lint, and render
         run: make chart-validate HELM_CONTEXT=
 
+  workflows:
+    name: GitHub Actions workflows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+
   image:
     name: Docker image
-    needs: [frontend, python, helm, secrets]
+    needs: [frontend, python, helm, workflows, secrets]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -194,6 +206,35 @@ jobs:
             echo "- API digest: \`$API_DIGEST\`"
             echo "- UI: \`$UI_IMAGE:$GITHUB_SHA\`"
             echo "- UI digest: \`$UI_DIGEST\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-ec2:
+    name: Deploy application to EC2
+    needs: image
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+    runs-on: [self-hosted, linux, x64, zipp-ec2]
+    timeout-minutes: 15
+    environment: EC2
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Deploy published images
+        run: make ec2-deploy-app IMAGE_TAG="$GITHUB_SHA"
+
+      - name: Write deployment summary
+        run: |
+          {
+            echo "## EC2 application deployment"
+            echo
+            echo "Deployed API and UI images for commit \`$GITHUB_SHA\`."
+            echo
+            echo "- API: \`ghcr.io/${GITHUB_REPOSITORY_OWNER}/zipp-api:$GITHUB_SHA\`"
+            echo "- UI: \`ghcr.io/${GITHUB_REPOSITORY_OWNER}/zipp-ui:$GITHUB_SHA\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   secrets:

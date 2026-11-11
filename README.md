@@ -569,6 +569,36 @@ storage class, installs or upgrades infrastructure, and deploys the API and UI
 with `IfNotPresent` pull policies. It does not start Minikube, build images, or
 import images into K3s.
 
+For routine application releases, deploy only the API, UI, and migration job:
+
+```bash
+make ec2-deploy-app IMAGE_TAG='<full-40-character-git-sha>'
+```
+
+This target requires the existing `zipp` release and `zipp-env` Secret. It does
+not reconcile PostgreSQL, Valkey, Kafka, Prometheus, or Grafana. Helm waits for
+the release and automatically rolls it back when the migration or application
+rollout fails.
+
+After a successful `master` image build, the `Deploy application to EC2` job
+runs this application-only target on the `zipp-ec2` self-hosted runner. The job
+uses the `EC2` GitHub environment and the immutable commit SHA that tagged both
+GHCR images. Add environment protection rules if deployment approval is
+required. If the EC2 runner is offline, the job remains queued until the runner
+reconnects.
+
+Bootstrap the runner's Kubernetes permissions once from an administrator
+context:
+
+```bash
+kubectl apply -f deploy/rbac/github-runner-deployer.yaml
+```
+
+The resulting service account can manage the Helm release in `zipp` and read
+that namespace object. It cannot change resources in `zipp-infra` or
+`zipp-observability`. Keep its kubeconfig outside the repository at
+`/home/github-runner/.kube/config`.
+
 Run Ruff checks:
 
 ```bash
