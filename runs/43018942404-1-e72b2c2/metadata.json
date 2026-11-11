@@ -1,0 +1,15 @@
+{
+  "commit_sha": "e72b2c24eee8b4e2ed21e1c4ceb0c7257bf87604",
+  "environment": "ec2-k3s",
+  "grafana_capture_outcome": "success",
+  "github_run_attempt": "1",
+  "github_run_id": "43018942404",
+  "github_run_url": "https://github.com/monishcse982/zipp/actions/runs/43018942404",
+  "preset": "mixed_redirect_ramp_up_down_spike_250user_10minutes",
+  "recorded_at_utc": "2026-11-11T12:28:01.779424+00:00",
+  "run_key": "43018942404-1-e72b2c2",
+  "run_note": "Verification of end to end load test setup",
+  "runner_name": "githb-runner",
+  "test_ended_at_utc": "2026-11-11T12:27:13.290000+00:00",
+  "test_started_at_utc": "2026-11-11T12:17:11.051000+00:00"
+}
