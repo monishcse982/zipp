@@ -13,8 +13,6 @@ from app.core.metrics import (
     kafka_messages_dlq,
     kafka_messages_processed,
     kafka_messages_received,
-    visit_event_to_persist_invalid_timestamp,
-    visit_event_to_persist_seconds,
 )
 from app.db.repositories.visits import VisitsRepository
 from app.db.session import close_db, init_db
@@ -48,23 +46,6 @@ async def process_visit_event(event: LinkVisitedEvent) -> None:
         referrer=event.referrer,
         ip_address=event.ip_address,
     )
-
-    # Event time is captured before Kafka enqueue, not at the HTTP response.
-    # Exclude invalid wall-clock samples without affecting the persisted visit.
-    if event.visited_at.utcoffset() is None:
-        visit_event_to_persist_invalid_timestamp.labels(
-            topic=LINK_VISITED_TOPIC, reason="missing_timezone"
-        ).inc()
-    else:
-        elapsed = (datetime.now(UTC) - event.visited_at).total_seconds()
-        if elapsed < 0:
-            visit_event_to_persist_invalid_timestamp.labels(
-                topic=LINK_VISITED_TOPIC, reason="future_timestamp"
-            ).inc()
-        else:
-            visit_event_to_persist_seconds.labels(topic=LINK_VISITED_TOPIC).observe(
-                elapsed
-            )
 
     logger.info(
         "Visit event processed event_id=%s link_id=%s short_code=%s",

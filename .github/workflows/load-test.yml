@@ -22,24 +22,12 @@ on:
         description: Reason for this load-test run
         required: true
         type: string
-      redirect_p95_ms:
-        description: Maximum redirect p95 in milliseconds (set all thresholds to enable)
-        required: false
-        type: string
-      redirect_p99_ms:
-        description: Maximum redirect p99 in milliseconds
-        required: false
-        type: string
-      redirect_error_percent:
-        description: Maximum redirect failure percentage (0 to 100)
-        required: false
-        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: zipp-ec2-workload
+  group: zipp-load-test-ec2
   cancel-in-progress: false
 
 jobs:
@@ -81,16 +69,6 @@ jobs:
             echo "Preset is not available in tests/load/presets: $PRESET" >&2
             exit 1
           fi
-
-      - name: Validate redirect threshold inputs
-        env:
-          P95_MS: ${{ inputs.redirect_p95_ms }}
-          P99_MS: ${{ inputs.redirect_p99_ms }}
-          ERROR_PERCENT: ${{ inputs.redirect_error_percent }}
-        run: |
-          python3 scripts/check-load-thresholds.py --validate-only \
-            --p95-ms "$P95_MS" --p99-ms "$P99_MS" \
-            --error-percent "$ERROR_PERCENT"
 
       - name: Verify API liveness and readiness
         env:
@@ -217,20 +195,6 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           exit "$load_exit_code"
 
-      - name: Evaluate redirect thresholds
-        id: thresholds
-        if: ${{ always() && steps.load.outcome == 'success' && steps.load.outputs.run_dir != '' }}
-        continue-on-error: true
-        env:
-          RUN_DIR: ${{ steps.load.outputs.run_dir }}
-          P95_MS: ${{ inputs.redirect_p95_ms }}
-          P99_MS: ${{ inputs.redirect_p99_ms }}
-          ERROR_PERCENT: ${{ inputs.redirect_error_percent }}
-        run: |
-          python3 scripts/check-load-thresholds.py "$RUN_DIR/locust_stats.csv" \
-            --p95-ms "$P95_MS" --p99-ms "$P99_MS" \
-            --error-percent "$ERROR_PERCENT" --output "$RUN_DIR/thresholds.json"
-
       - name: Capture Grafana dashboards
         id: grafana
         if: ${{ always() && steps.load.outputs.run_dir != '' }}
@@ -340,9 +304,6 @@ jobs:
               "test_ended_at_utc": ended_at.isoformat(),
               "test_started_at_utc": started_at.isoformat(),
           }
-          threshold_path = Path(os.environ["RUN_DIR"]) / "thresholds.json"
-          if threshold_path.is_file():
-              metadata["thresholds"] = json.loads(threshold_path.read_text(encoding="utf-8"))
           output = Path(os.environ["RUN_DIR"]) / "metadata.json"
           output.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
           PY
@@ -450,8 +411,6 @@ jobs:
           GRAFANA_OUTCOME: ${{ steps.grafana.outcome }}
           REPORT_SCAN_OUTCOME: ${{ steps.sensitive.outcome }}
           PAGES_BUNDLE_OUTCOME: ${{ steps.pages.outcome }}
-          THRESHOLD_OUTCOME: ${{ steps.thresholds.outcome }}
-          RUN_DIR: ${{ steps.load.outputs.run_dir }}
         run: |
           {
             echo "## EC2 load test"
@@ -463,24 +422,10 @@ jobs:
             echo "- Load-test result: \`${LOAD_OUTCOME:-not-run}\`"
             echo "- Grafana screenshots: \`${GRAFANA_OUTCOME:-not-run}\`"
             echo "- Report safety scan: \`${REPORT_SCAN_OUTCOME:-not-run}\`"
-            echo "- Threshold evaluation step: \`${THRESHOLD_OUTCOME:-not-run}\` (see artifact for PASS, FAIL, or NOT_EVALUATED)"
             echo "- Pages bundle: \`${PAGES_BUNDLE_OUTCOME:-not-run}\`"
             echo "- Artifact retention: 90 days"
             echo "- Run note: $RUN_NOTE"
-            if [[ -n "$RUN_DIR" && -f "$RUN_DIR/thresholds.json" ]]; then
-              echo
-              echo '### Redirect threshold result'
-              echo '```json'
-              cat "$RUN_DIR/thresholds.json"
-              echo '```'
-            fi
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Enforce redirect thresholds
-        if: ${{ always() && steps.thresholds.outcome == 'failure' }}
-        run: |
-          echo "Redirect threshold evaluation failed. Evidence was retained when available." >&2
-          exit 1
 
   publish-report:
     name: Publish performance report
@@ -523,7 +468,7 @@ jobs:
             git switch --force-create performance-reports origin/performance-reports
           else
             git switch --orphan performance-reports
-            git rm -r --force --ignore-unmatch .
+            git rm --recursive --force --ignore-unmatch .
             git clean -dffx
           fi
 

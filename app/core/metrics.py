@@ -126,36 +126,6 @@ kafka_message_processing_duration_seconds = Histogram(
     ["topic"],
 )
 
-visit_event_to_persist_seconds = Histogram(
-    "visit_event_to_persist_seconds",
-    "Time from visit event timestamp to successful database write return",
-    ["topic"],
-    buckets=(
-        0.01,
-        0.025,
-        0.05,
-        0.1,
-        0.25,
-        0.5,
-        1,
-        2.5,
-        5,
-        10,
-        30,
-        60,
-        120,
-        300,
-        600,
-        1800,
-    ),
-)
-
-visit_event_to_persist_invalid_timestamp = Counter(
-    "visit_event_to_persist_invalid_timestamp",
-    "Persisted visits omitted from latency metrics due to invalid event timestamps",
-    ["topic", "reason"],
-)
-
 time_limited_link_cache_hits = Counter(
     "time_limited_link_cache_hits",
     "Total number of time-limited links successfully served from cache",
@@ -191,6 +161,4 @@ __all__ = [
     "time_limited_link_cache_hits",
     "time_limited_link_cache_misses",
     "list_links_latency_seconds",
-    "visit_event_to_persist_seconds",
-    "visit_event_to_persist_invalid_timestamp",
 ]

@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: zipp-ec2-workload
+  group: ec2-application-deployment
   cancel-in-progress: false
 
 jobs:

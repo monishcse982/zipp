@@ -67,22 +67,11 @@
       "kafka": {
         "kind": "Panel",
         "spec": {
-          "data": {"kind": "QueryGroup", "spec": {"queries": [{"kind": "PanelQuery", "spec": {"hidden": false, "query": {"datasource": {"name": "prometheus"}, "group": "prometheus", "kind": "DataQuery", "spec": {"expr": "sum by (topic) (rate(kafka_server_brokertopicmetrics_messagesin_total[5m]))", "legendFormat": "Messages in {{topic}}"}, "version": "v0"}, "refId": "A"}}], "queryOptions": {}, "transformations": []}},
-          "description": "Kafka broker message throughput. Missing data may indicate an unavailable scrape target.",
+          "data": {"kind": "QueryGroup", "spec": {"queries": [{"kind": "PanelQuery", "spec": {"hidden": false, "query": {"datasource": {"name": "prometheus"}, "group": "prometheus", "kind": "DataQuery", "spec": {"expr": "sum by (topic) (rate(kafka_server_brokertopicmetrics_messagesin_total[5m]))", "legendFormat": "Messages in {{topic}}"}, "version": "v0"}, "refId": "A"}}, {"kind": "PanelQuery", "spec": {"hidden": false, "query": {"datasource": {"name": "prometheus"}, "group": "prometheus", "kind": "DataQuery", "spec": {"expr": "sum(kafka_consumergroup_lag_sum)", "legendFormat": "Consumer lag"}, "version": "v0"}, "refId": "B"}}], "queryOptions": {}, "transformations": []}},
+          "description": "Kafka throughput and consumer lag. Panels remain empty until Strimzi metrics are enabled.",
           "id": 5,
           "links": [],
           "title": "Kafka Health",
-          "vizConfig": {"group": "timeseries", "kind": "VizConfig", "spec": {"fieldConfig": {"defaults": {"unit": "short"}, "overrides": []}, "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi"}}, "version": "13.2.2"}}
-        }
-      },
-      "kafka-lag": {
-        "kind": "Panel",
-        "spec": {
-          "data": {"kind": "QueryGroup", "spec": {"queries": [{"kind": "PanelQuery", "spec": {"hidden": false, "query": {"datasource": {"name": "prometheus"}, "group": "prometheus", "kind": "DataQuery", "spec": {"expr": "sum by (consumergroup, topic) (kafka_consumergroup_lag_sum)", "legendFormat": "{{consumergroup}} / {{topic}}"}, "version": "v0"}, "refId": "A"}}], "queryOptions": {}, "transformations": []}},
-          "description": "Committed offset lag in messages per consumer group and topic. No data is not zero; verify the Kafka Exporter target and active committed offsets.",
-          "id": 8,
-          "links": [],
-          "title": "Kafka Consumer Lag",
           "vizConfig": {"group": "timeseries", "kind": "VizConfig", "spec": {"fieldConfig": {"defaults": {"unit": "short"}, "overrides": []}, "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi"}}, "version": "13.2.2"}}
         }
       },
@@ -98,7 +87,7 @@
         }
       }
     },
-    "layout": {"kind": "GridLayout", "spec": {"items": [{"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "pod-health"}, "height": 8, "width": 12, "x": 0, "y": 0}}, {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "pod-resources"}, "height": 8, "width": 12, "x": 0, "y": 8}}, {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "pod-memory"}, "height": 8, "width": 12, "x": 12, "y": 0}}, {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "kafka-lag"}, "height": 8, "width": 12, "x": 12, "y": 8}}, {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "pod-network"}, "height": 8, "width": 12, "x": 0, "y": 16}}, {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "postgres"}, "height": 8, "width": 12, "x": 12, "y": 16}}, {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "kafka"}, "height": 8, "width": 12, "x": 0, "y": 24}}, {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "valkey"}, "height": 8, "width": 12, "x": 12, "y": 24}}]}},
+    "layout": {"kind": "GridLayout", "spec": {"items": [{"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "pod-health"}, "height": 8, "width": 12, "x": 0, "y": 0}}, {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "pod-resources"}, "height": 8, "width": 12, "x": 0, "y": 8}}, {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "pod-memory"}, "height": 8, "width": 12, "x": 12, "y": 0}}, {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "pod-network"}, "height": 8, "width": 12, "x": 0, "y": 16}}, {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "postgres"}, "height": 8, "width": 12, "x": 12, "y": 16}}, {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "kafka"}, "height": 8, "width": 12, "x": 0, "y": 24}}, {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "valkey"}, "height": 8, "width": 12, "x": 12, "y": 24}}]}},
     "links": [],
     "liveNow": false,
     "preload": false,

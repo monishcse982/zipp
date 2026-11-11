@@ -1247,36 +1247,6 @@
           }
         }
       },
-      "panel-12": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {"kind": "PanelQuery", "spec": {"hidden": false, "refId": "A", "query": {"datasource": {"name": "prometheus"}, "group": "prometheus", "kind": "DataQuery", "spec": {"expr": "histogram_quantile(0.50, sum by (le, topic) (rate(visit_event_to_persist_seconds_bucket[5m])))", "legendFormat": "p50 {{topic}}"}, "version": "v0"}}},
-                {"kind": "PanelQuery", "spec": {"hidden": false, "refId": "B", "query": {"datasource": {"name": "prometheus"}, "group": "prometheus", "kind": "DataQuery", "spec": {"expr": "histogram_quantile(0.95, sum by (le, topic) (rate(visit_event_to_persist_seconds_bucket[5m])))", "legendFormat": "p95 {{topic}}"}, "version": "v0"}}},
-                {"kind": "PanelQuery", "spec": {"hidden": false, "refId": "C", "query": {"datasource": {"name": "prometheus"}, "group": "prometheus", "kind": "DataQuery", "spec": {"expr": "histogram_quantile(0.99, sum by (le, topic) (rate(visit_event_to_persist_seconds_bucket[5m])))", "legendFormat": "p99 {{topic}}"}, "version": "v0"}}}
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "Time from event timestamp before Kafka enqueue to successful visit database write return. Excludes failed, lost, and invalid-clock events; not client-perceived redirect-to-row latency. Compare with message flow, failures, and consumer lag.",
-          "id": 12,
-          "links": [],
-          "title": "Visit Event to Persist Latency",
-          "vizConfig": {
-            "group": "timeseries",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "s"}, "overrides": []},
-              "options": {"legend": {"calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}}
-            },
-            "version": "13.2.2"
-          }
-        }
-      },
       "panel-11": {
         "kind": "Panel",
         "spec": {
@@ -1539,19 +1509,6 @@
               "height": 8,
               "width": 12,
               "x": 0,
-              "y": 29
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-12"
-              },
-              "height": 8,
-              "width": 12,
-              "x": 12,
               "y": 29
             }
           }

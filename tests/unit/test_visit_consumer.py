@@ -1,6 +1,6 @@
 import json
 import unittest
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -135,78 +135,6 @@ class VisitConsumerMessageTests(unittest.IsolatedAsyncioTestCase):
             referrer="https://example.com/referrer",
             ip_address="192.0.2.5",
         )
-
-    async def test_persist_latency_observed_after_successful_write(self):
-        now = datetime(2026, 1, 1, tzinfo=UTC)
-        event = LinkVisitedEvent(
-            link_id=42, short_code="example-code", visited_at=now - timedelta(seconds=3)
-        )
-        repository = SimpleNamespace(create=AsyncMock())
-        with (
-            patch.object(visit_consumer, "VisitsRepository", return_value=repository),
-            patch.object(visit_consumer, "datetime", wraps=datetime) as clock,
-            patch.object(visit_consumer, "visit_event_to_persist_seconds") as latency,
-            patch.object(
-                visit_consumer, "visit_event_to_persist_invalid_timestamp"
-            ) as invalid,
-        ):
-            clock.now.return_value = now
-            await visit_consumer.process_visit_event(event)
-
-        latency.labels.assert_called_once_with(topic=LINK_VISITED_TOPIC)
-        latency.labels.return_value.observe.assert_called_once_with(3.0)
-        invalid.labels.assert_not_called()
-
-    async def test_failed_write_does_not_record_persist_latency(self):
-        event = LinkVisitedEvent(
-            link_id=42, short_code="example-code", visited_at=datetime.now(UTC)
-        )
-        repository = SimpleNamespace(create=AsyncMock(side_effect=RuntimeError("db")))
-        with (
-            patch.object(visit_consumer, "VisitsRepository", return_value=repository),
-            patch.object(visit_consumer, "visit_event_to_persist_seconds") as latency,
-            patch.object(
-                visit_consumer, "visit_event_to_persist_invalid_timestamp"
-            ) as invalid,
-        ):
-            with self.assertRaisesRegex(RuntimeError, "db"):
-                await visit_consumer.process_visit_event(event)
-
-        latency.labels.assert_not_called()
-        invalid.labels.assert_not_called()
-
-    async def test_invalid_event_timestamp_is_counted_after_write(self):
-        now = datetime(2026, 1, 1, tzinfo=UTC)
-        for visited_at, reason in (
-            (now.replace(tzinfo=None), "missing_timezone"),
-            (now + timedelta(seconds=1), "future_timestamp"),
-        ):
-            with self.subTest(reason=reason):
-                event = LinkVisitedEvent(
-                    link_id=42, short_code="example-code", visited_at=visited_at
-                )
-                repository = SimpleNamespace(create=AsyncMock())
-                with (
-                    patch.object(
-                        visit_consumer, "VisitsRepository", return_value=repository
-                    ),
-                    patch.object(visit_consumer, "datetime", wraps=datetime) as clock,
-                    patch.object(
-                        visit_consumer, "visit_event_to_persist_seconds"
-                    ) as latency,
-                    patch.object(
-                        visit_consumer, "visit_event_to_persist_invalid_timestamp"
-                    ) as invalid,
-                ):
-                    clock.now.return_value = now
-                    await visit_consumer.process_visit_event(event)
-
-                repository.create.assert_awaited_once()
-                latency.labels.assert_not_called()
-                invalid.labels.assert_called_once_with(
-                    topic=LINK_VISITED_TOPIC, reason=reason
-                )
-                invalid.labels.return_value.inc.assert_called_once()
 
     async def test_consumer_polls_and_closes_after_shutdown_signal(self):
         fake_consumer = MagicMock()

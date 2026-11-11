@@ -96,7 +96,7 @@ gh run watch
 
 The workflow validates the preset, checks API liveness and readiness and Grafana rendering, runs Locust, and captures both dashboards for the test window. It scans report files for configured credentials and token patterns, uploads the run as a 90-day Actions artifact, and publishes a sanitized report bundle and history to GitHub Pages. Load tests against this environment are serialized.
 
-For a mixed-redirect run, optionally provide all three workflow inputs: `redirect_p95_ms`, `redirect_p99_ms`, and `redirect_error_percent`. The gate evaluates the named redirect request row and fails the run if a measured value exceeds its limit or the required statistics are missing. Evidence is retained when available even if the gate fails. Leave all three blank for `NOT_EVALUATED`; partial or invalid inputs fail before the load starts. These are per-run thresholds, not established SLOs, and redirect thresholds do not apply to presets without redirect traffic.
+The workflow publishes observations and does not currently enforce performance thresholds. Define meaningful objectives before treating a run as a performance pass or failure.
 
 ## Run locally
 
@@ -121,7 +121,7 @@ Before running, record the question, expected behavior, workload, target version
 
 Locust's **Final ratio** section describes configured task weights and final user-class counts; it is not a count of executed requests. A shape that ends with zero users can display zero for the final class and total ratios. Use request statistics for observed traffic.
 
-A successful workflow confirms execution and publication; it does not establish a performance pass without explicit thresholds. The current cache-hit graph can help explain results, but a run-specific hit ratio and database-load comparison have not yet been validated. A new [event-to-persistence histogram](docs/visit-persistence-metrics.md) measures successful writes from the event timestamp; it does not include the entire client redirect, account for missing events, or replace consumer-lag evidence. A Kafka exporter and lag panel are configured in the charts; their deployment and scrape still require verification.
+A successful workflow confirms execution and publication; it does not establish a performance pass without explicit thresholds. The cache-hit graph can help explain results, but a run-specific hit ratio and database-load comparison have not yet been validated. Consumer lag and redirect-to-persistence latency are not yet verified as end-to-end indicators.
 
 ## Test strategy
 
@@ -141,7 +141,7 @@ A successful workflow confirms execution and publication; it does not establish 
 
 ## Deployment and observability
 
-Pull requests run Python and frontend checks, unit tests, Helm validation, workflow validation, image builds, and secret scans. Successful pushes to `master` publish API and UI images to GHCR using immutable commit-SHA tags and deploy the application release to EC2. A separate [manual deployment workflow](.github/workflows/deploy-ec2.yml) supports a specific previously published SHA. The automatic and manual deployments and load tests share a concurrency group. GitHub's default concurrency behavior permits one pending run per group and can replace an older pending run; manual deployments outside Actions are not protected by this lock. The current EC2 runner has both `zipp-ec2` and `zipp-load` labels. Infrastructure and observability chart changes require an explicit stack update.
+Pull requests run Python and frontend checks, unit tests, Helm validation, workflow validation, image builds, and secret scans. Successful pushes to `master` publish API and UI images to GHCR using immutable commit-SHA tags and deploy the application release to EC2. A separate [manual deployment workflow](.github/workflows/deploy-ec2.yml) supports a specific previously published SHA. The deployment and load-test workflows use different concurrency groups, so coordinate deployments and tests to avoid overlapping them. The current EC2 runner has both `zipp-ec2` and `zipp-load` labels. Infrastructure and observability chart changes require an explicit stack update.
 
 The EC2 port-forward service keeps the API, UI, Grafana, Prometheus, PostgreSQL, and Valkey available on host loopback, with recovery after stale forwards. [EC2 setup and operations](docs/operations-guide.md) cover configuration, deployment, access, and troubleshooting. Dashboard definitions live in [deploy/charts/zipp-observability/dashboards](deploy/charts/zipp-observability/dashboards).
 
@@ -149,7 +149,7 @@ The EC2 port-forward service keeps the API, UI, Grafana, Prometheus, PostgreSQL,
 
 - Define and gate agreed latency and error objectives; repeat the same preset to quantify variance before claiming a regression or improvement.
 - Compare direct cluster access with the port-forward path, then move the load generator to a separate host.
-- Verify consumer lag and add end-to-end reconciliation alongside the event-to-persistence latency metric.
+- Measure consumer lag and event-to-persistence latency, and add end-to-end reconciliation.
 - Run bounded Litmus chaos hypotheses under load and correlate recovery with application and infrastructure metrics.
 - Host the application on Amazon EKS to explore a managed Kubernetes deployment.
 - Host the load runner on EKS and scale load generation independently of the application.
@@ -160,6 +160,4 @@ The EC2 port-forward service keeps the API, UI, Grafana, Prometheus, PostgreSQL,
 - [Operations guide](docs/operations-guide.md): local and EC2 setup, deployment, and troubleshooting.
 - [Roadmap](docs/roadmap.md): next improvements and known opportunities.
 - [Cognito API and UI design](docs/cognito-management-ui-plan.md): authentication and management decisions.
-- [Visit persistence metrics](docs/visit-persistence-metrics.md): metric scope, clock assumptions, and delivery limitations.
-- [Kafka consumer lag](docs/kafka-consumer-lag.md): exporter setup and post-deployment verification.
 - [Litmus experiment proposals](docs/chaos-experiments.md): hypotheses, evidence, and safety boundaries.
