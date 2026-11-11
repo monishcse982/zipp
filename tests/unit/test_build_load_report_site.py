@@ -70,6 +70,23 @@ class BuildLoadReportSiteTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             REPORT_SITE.merge_bundle(bundle_dir, site_dir)
 
+    def test_bundle_displays_and_escapes_threshold_results(self) -> None:
+        self.metadata["thresholds"] = {
+            "status": "FAIL",
+            "reason": "<unexpected>",
+            "observed": {"p95_ms": 500},
+        }
+        (self.run_dir / "metadata.json").write_text(
+            json.dumps(self.metadata), encoding="utf-8"
+        )
+        bundle_dir = self.root / "bundle"
+        REPORT_SITE.build_bundle(self.run_dir, bundle_dir)
+        page = (bundle_dir / "index.html").read_text(encoding="utf-8")
+        self.assertIn("Redirect threshold evaluation", page)
+        self.assertIn("FAIL", page)
+        self.assertIn("&lt;unexpected&gt;", page)
+        self.assertNotIn("<unexpected>", page)
+
     def test_metadata_rejects_unsafe_run_key(self) -> None:
         metadata_path = self.run_dir / "metadata.json"
         self.metadata["run_key"] = "../../unsafe"

@@ -68,3 +68,12 @@ kafka:
   clusterName: zipp
   userName: zipp-user
   storageSize: 2Gi
+  exporter:
+    enabled: true
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi

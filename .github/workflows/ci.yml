@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   frontend:
@@ -216,7 +216,7 @@ jobs:
     timeout-minutes: 15
     environment: EC2
     concurrency:
-      group: ec2-application-deployment
+      group: zipp-ec2-workload
       cancel-in-progress: false
     permissions:
       contents: read

@@ -64,6 +64,14 @@ spec:
       transaction.state.log.min.isr: 1
       default.replication.factor: 1
       min.insync.replicas: 1
+  {{- if .Values.kafka.exporter.enabled }}
+  kafkaExporter:
+    # Strimzi manages its mTLS certificate for the internal replication listener.
+    groupRegex: ".*"
+    topicRegex: ".*"
+    resources:
+      {{- toYaml .Values.kafka.exporter.resources | nindent 6 }}
+  {{- end }}
   entityOperator:
     topicOperator:
       resources:

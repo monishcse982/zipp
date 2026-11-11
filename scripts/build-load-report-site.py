@@ -110,6 +110,14 @@ def build_bundle(run_dir: Path, output_dir: Path) -> None:
     environment = html.escape(str(metadata["environment"]))
     commit_sha = html.escape(str(metadata["commit_sha"]))
     github_run_url = html.escape(str(metadata["github_run_url"]), quote=True)
+    thresholds = metadata.get("thresholds")
+    threshold_section = ""
+    if thresholds is not None:
+        threshold_json = html.escape(json.dumps(thresholds, indent=2))
+        threshold_section = (
+            '<section class="report"><h2>Redirect threshold evaluation</h2>'
+            f"<pre>{threshold_json}</pre></section>"
+        )
     content = f"""
   <p><a href="../../index.html">&larr; All load-test runs</a></p>
   <h1>{html.escape(title)}</h1>
@@ -127,6 +135,7 @@ def build_bundle(run_dir: Path, output_dir: Path) -> None:
     <p><strong>Commit:</strong> <code>{commit_sha}</code></p>
     <p><a href="{github_run_url}">GitHub Actions run</a></p>
   </section>
+  {threshold_section}
   <section class="report">
     <h2>Locust report</h2>
     <p><a href="report.html">Open the native Locust HTML report</a></p>
