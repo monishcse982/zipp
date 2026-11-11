@@ -54,9 +54,50 @@ PROMETHEUS_SERVICE := $(MONITORING_RELEASE)-kube-prometheus-prometheus
 GRAFANA_PORT ?= 3000
 PROMETHEUS_PORT ?= 9090
 PORT_FORWARD_FRONTEND ?= 1
-APP_HELM_IMAGE_ARGS = --set-string image.repository=$(IMAGE) --set-string image.tag=$(IMAGE_TAG) --set-string image.pullPolicy=$(IMAGE_PULL_POLICY) --set-string frontend.image.repository=$(FRONTEND_IMAGE) --set-string frontend.image.tag=$(FRONTEND_IMAGE_TAG) --set-string frontend.image.pullPolicy=$(FRONTEND_IMAGE_PULL_POLICY)
+APP_HELM_IMAGE_ARGS = \
+	--set-string image.repository=$(IMAGE) \
+	--set-string image.tag=$(IMAGE_TAG) \
+	--set-string image.pullPolicy=$(IMAGE_PULL_POLICY) \
+	--set-string frontend.image.repository=$(FRONTEND_IMAGE) \
+	--set-string frontend.image.tag=$(FRONTEND_IMAGE_TAG) \
+	--set-string frontend.image.pullPolicy=$(FRONTEND_IMAGE_PULL_POLICY)
+APP_HELM_ARGS = $(APP_HELM_IMAGE_ARGS) --set monitoring.serviceMonitor.interval=$(SCRAPE_INTERVAL)
+APP_HELM_UPGRADE = \
+	helm upgrade --install $(RELEASE) $(APP_CHART) $(HELM_CONTEXT) \
+	--namespace $(NAMESPACE) \
+	$(APP_HELM_ARGS) \
+	--atomic \
+	--wait \
+	--timeout 5m
+INFRA_HELM_ARGS = --set valkey.metrics.serviceMonitor.interval=$(SCRAPE_INTERVAL)
+OBSERVABILITY_HELM_ARGS = \
+	--set kube-prometheus-stack.prometheus.prometheusSpec.scrapeInterval=$(SCRAPE_INTERVAL) \
+	--set kube-prometheus-stack.prometheus.prometheusSpec.evaluationInterval=$(SCRAPE_INTERVAL) \
+	--set-string kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=$(PROMETHEUS_STORAGE_CLASS)
+EC2_APP_OVERRIDES = \
+	PROFILE=$(EC2_PROFILE) \
+	IMAGE=$(GHCR_NAMESPACE)/zipp-api \
+	IMAGE_TAG=$(IMAGE_TAG) \
+	IMAGE_PULL_POLICY=IfNotPresent \
+	FRONTEND_IMAGE=$(GHCR_NAMESPACE)/zipp-ui \
+	FRONTEND_IMAGE_TAG=$(IMAGE_TAG) \
+	FRONTEND_IMAGE_PULL_POLICY=IfNotPresent
 
-.PHONY: help unit-test coverage app-up app-start app-redeploy ec2-up frontend-deps frontend-env-check infra-up infra-start infra-stop infra-status cluster-up cluster-stop cluster-status image-build image-load validate-env namespace infra-namespace secret postgres-secret valkey-secret kafka-operator monitoring-install monitoring-status grafana-password postgres-password valkey-password kafka-password prometheus-password grafana-forward prometheus-forward chart-deps chart-validate deploy deploy-infra deploy-app wait-infra wait-app sync-kafka-password infra-ready migration-status status logs port-forward ec2-deploy-app deploy-app-release port-forward-app port-forward-all diagnose-port-forward restart uninstall cluster-delete makemigrations migrate
+.PHONY: \
+	help unit-test coverage \
+	app-up app-start app-redeploy \
+	ec2-up ec2-deploy-app validate-image-tag deploy-app-release verify-app-release \
+	frontend-deps frontend-env-check \
+	infra-up infra-start infra-stop infra-status \
+	cluster-up cluster-stop cluster-status require-minikube cluster-delete \
+	image-build image-load \
+	validate-env namespace infra-namespace secret postgres-secret valkey-secret \
+	kafka-operator monitoring-install monitoring-status \
+	grafana-password postgres-password valkey-password kafka-password prometheus-password \
+	grafana-forward prometheus-forward port-forward port-forward-app port-forward-all diagnose-port-forward \
+	chart-deps chart-validate \
+	deploy deploy-infra deploy-app wait-infra wait-app sync-kafka-password infra-ready \
+	migration-status status logs restart uninstall makemigrations migrate
 
 help: ## Show the available commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target> [VARIABLE=value]\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -90,44 +131,29 @@ app-start: frontend-env-check infra-start ## Resume an existing Minikube stack a
 app-redeploy: frontend-env-check image-load wait-app ## Rebuild, load, and deploy application images without reinstalling the stack.
 	$(MAKE) port-forward-all
 
-ec2-up: ## Deploy the complete K3s stack from immutable GHCR images.
-	@if [[ ! "$(IMAGE_TAG)" =~ ^[0-9a-f]{40}$$ ]]; then echo "IMAGE_TAG must be the full 40-character Git commit SHA"; exit 1; fi
-	$(MAKE) infra-ready \
-		CLUSTER_RUNTIME=external \
-		PROFILE=$(EC2_PROFILE) \
-		PROMETHEUS_STORAGE_CLASS=local-path \
-		IMAGE=$(GHCR_NAMESPACE)/zipp-api \
-		IMAGE_TAG=$(IMAGE_TAG) \
-		IMAGE_PULL_POLICY=IfNotPresent \
-		FRONTEND_IMAGE=$(GHCR_NAMESPACE)/zipp-ui \
-		FRONTEND_IMAGE_TAG=$(IMAGE_TAG) \
-		FRONTEND_IMAGE_PULL_POLICY=IfNotPresent
-
-ec2-deploy-app: ## Deploy only the API and UI from immutable GHCR images to EC2.
+validate-image-tag:
 	@if [[ ! "$(IMAGE_TAG)" =~ ^[0-9a-f]{40}$$ ]]; then \
 		echo "IMAGE_TAG must be the full 40-character Git commit SHA"; \
 		exit 1; \
 	fi
+
+ec2-up: validate-image-tag ## Deploy the complete K3s stack from immutable GHCR images.
+	$(MAKE) infra-ready \
+		CLUSTER_RUNTIME=external \
+		PROMETHEUS_STORAGE_CLASS=local-path \
+		$(EC2_APP_OVERRIDES)
+
+ec2-deploy-app: validate-image-tag ## Deploy only the API and UI from immutable GHCR images to EC2.
 	$(MAKE) deploy-app-release \
-		PROFILE=$(EC2_PROFILE) \
-		IMAGE=$(GHCR_NAMESPACE)/zipp-api \
-		IMAGE_TAG=$(IMAGE_TAG) \
-		IMAGE_PULL_POLICY=IfNotPresent \
-		FRONTEND_IMAGE=$(GHCR_NAMESPACE)/zipp-ui \
-		FRONTEND_IMAGE_TAG=$(IMAGE_TAG) \
-		FRONTEND_IMAGE_PULL_POLICY=IfNotPresent
+		$(EC2_APP_OVERRIDES)
 
 deploy-app-release: ## Upgrade only the existing application release and verify its rollout.
 	$(KUBECTL) get namespace $(NAMESPACE) >/dev/null
 	$(KUBECTL) get secret zipp-env --namespace $(NAMESPACE) >/dev/null
-	helm upgrade --install $(RELEASE) $(APP_CHART) \
-		$(HELM_CONTEXT) \
-		--namespace $(NAMESPACE) \
-		$(APP_HELM_IMAGE_ARGS) \
-		--set monitoring.serviceMonitor.interval=$(SCRAPE_INTERVAL) \
-		--atomic \
-		--wait \
-		--timeout 5m
+	$(APP_HELM_UPGRADE)
+	$(MAKE) verify-app-release
+
+verify-app-release:
 	$(KUBECTL) wait \
 		--namespace $(NAMESPACE) \
 		--for=condition=complete \
@@ -167,18 +193,31 @@ cluster-up: ## Start Minikube or verify an externally managed Kubernetes context
 		exit 1; \
 	fi
 
-cluster-stop: ## Stop the Minikube profile without deleting it.
+cluster-stop: require-minikube ## Stop the Minikube profile without deleting it.
 	minikube stop --profile $(PROFILE)
 
 cluster-status: ## Show Minikube and Kubernetes node status.
-	minikube status --profile $(PROFILE)
-	$(KUBECTL) get nodes -o wide
+	@if [ "$(CLUSTER_RUNTIME)" = "external" ]; then \
+		$(KUBECTL) get nodes -o wide; \
+	elif [ "$(CLUSTER_RUNTIME)" = "minikube" ]; then \
+		minikube status --profile $(PROFILE); \
+		$(KUBECTL) get nodes -o wide; \
+	else \
+		echo "Unsupported CLUSTER_RUNTIME: $(CLUSTER_RUNTIME) (expected minikube or external)"; \
+		exit 1; \
+	fi
+
+require-minikube:
+	@test "$(CLUSTER_RUNTIME)" = "minikube" || { \
+		echo "This target only supports CLUSTER_RUNTIME=minikube"; \
+		exit 1; \
+	}
 
 image-build: frontend-env-check ## Build the API and static UI images.
 	docker build -t $(IMAGE):$(IMAGE_TAG) .
 	python3 scripts/build-frontend-image.py "$(FRONTEND_IMAGE):$(FRONTEND_IMAGE_TAG)"
 
-image-load: cluster-up image-build ## Load the application image into Minikube.
+image-load: require-minikube cluster-up image-build ## Load the application image into Minikube.
 	minikube image load $(IMAGE):$(IMAGE_TAG) --profile $(PROFILE)
 	minikube image load $(FRONTEND_IMAGE):$(FRONTEND_IMAGE_TAG) --profile $(PROFILE)
 	@minikube image ls --profile $(PROFILE) | grep -F "$(IMAGE):$(IMAGE_TAG)"
@@ -207,7 +246,7 @@ kafka-operator: infra-namespace ## Install or upgrade the Strimzi Kafka operator
 	helm upgrade --install $(STRIMZI_RELEASE) $(STRIMZI_CHART) $(HELM_CONTEXT) --version $(STRIMZI_VERSION) --namespace $(INFRA_NAMESPACE) --values $(STRIMZI_VALUES) --wait --timeout 10m
 
 monitoring-install: cluster-up ## Install or upgrade Prometheus and Grafana.
-	helm upgrade --install $(MONITORING_RELEASE) $(OBSERVABILITY_CHART) $(HELM_CONTEXT) --namespace $(MONITORING_NAMESPACE) --create-namespace --set kube-prometheus-stack.prometheus.prometheusSpec.scrapeInterval=$(SCRAPE_INTERVAL) --set kube-prometheus-stack.prometheus.prometheusSpec.evaluationInterval=$(SCRAPE_INTERVAL) --set-string kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=$(PROMETHEUS_STORAGE_CLASS) --wait --timeout 15m
+	helm upgrade --install $(MONITORING_RELEASE) $(OBSERVABILITY_CHART) $(HELM_CONTEXT) --namespace $(MONITORING_NAMESPACE) --create-namespace $(OBSERVABILITY_HELM_ARGS) --wait --timeout 15m
 
 monitoring-status: ## Show Prometheus and Grafana resources.
 	helm list $(HELM_CONTEXT) --namespace $(MONITORING_NAMESPACE)
@@ -249,12 +288,12 @@ chart-validate: ## Build dependencies, lint all charts, and render all releases.
 	helm lint $(APP_CHART)
 	helm lint $(INFRA_CHART)
 	helm lint $(OBSERVABILITY_CHART)
-	helm template $(RELEASE) $(APP_CHART) $(HELM_CONTEXT) --namespace $(NAMESPACE) $(APP_HELM_IMAGE_ARGS) --set monitoring.serviceMonitor.interval=$(SCRAPE_INTERVAL) > $(RENDERED_APP_MANIFEST)
-	helm template $(INFRA_RELEASE) $(INFRA_CHART) $(HELM_CONTEXT) --namespace $(INFRA_NAMESPACE) --set valkey.metrics.serviceMonitor.interval=$(SCRAPE_INTERVAL) > $(RENDERED_INFRA_MANIFEST)
-	helm template $(MONITORING_RELEASE) $(OBSERVABILITY_CHART) $(HELM_CONTEXT) --namespace $(MONITORING_NAMESPACE) --set kube-prometheus-stack.prometheus.prometheusSpec.scrapeInterval=$(SCRAPE_INTERVAL) --set kube-prometheus-stack.prometheus.prometheusSpec.evaluationInterval=$(SCRAPE_INTERVAL) --set-string kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=$(PROMETHEUS_STORAGE_CLASS) > $(RENDERED_OBSERVABILITY_MANIFEST)
+	helm template $(RELEASE) $(APP_CHART) $(HELM_CONTEXT) --namespace $(NAMESPACE) $(APP_HELM_ARGS) > $(RENDERED_APP_MANIFEST)
+	helm template $(INFRA_RELEASE) $(INFRA_CHART) $(HELM_CONTEXT) --namespace $(INFRA_NAMESPACE) $(INFRA_HELM_ARGS) > $(RENDERED_INFRA_MANIFEST)
+	helm template $(MONITORING_RELEASE) $(OBSERVABILITY_CHART) $(HELM_CONTEXT) --namespace $(MONITORING_NAMESPACE) $(OBSERVABILITY_HELM_ARGS) > $(RENDERED_OBSERVABILITY_MANIFEST)
 
 deploy-infra: postgres-secret valkey-secret kafka-operator monitoring-install ## Install or upgrade PostgreSQL, Valkey, Kafka, and observability.
-	helm upgrade --install $(INFRA_RELEASE) $(INFRA_CHART) $(HELM_CONTEXT) --namespace $(INFRA_NAMESPACE) --set valkey.metrics.serviceMonitor.interval=$(SCRAPE_INTERVAL) --timeout 5m
+	helm upgrade --install $(INFRA_RELEASE) $(INFRA_CHART) $(HELM_CONTEXT) --namespace $(INFRA_NAMESPACE) $(INFRA_HELM_ARGS) --timeout 5m
 
 wait-infra: deploy-infra ## Wait for infrastructure dependencies and Kafka resources.
 	$(KUBECTL) rollout status statefulset/$(POSTGRES_STATEFULSET) --namespace $(INFRA_NAMESPACE) --timeout=10m
@@ -268,14 +307,12 @@ sync-kafka-password: wait-infra secret ## Copy Kafka credentials into the app na
 	@password_b64=$$($(KUBECTL) get secret $(KAFKA_USER) --namespace $(INFRA_NAMESPACE) -o jsonpath='{.data.password}'); if [ -z "$$password_b64" ]; then echo "Kafka password was not generated"; exit 1; fi; $(KUBECTL) patch secret zipp-env --namespace $(NAMESPACE) --type=merge -p '{"data":{"KAFKA_PASSWORD":"'"$$password_b64"'"}}' >/dev/null; echo "Kafka password synchronized to zipp-env"
 
 deploy-app: sync-kafka-password ## Install or upgrade the API and UI in the app namespace.
-	helm upgrade --install $(RELEASE) $(APP_CHART) $(HELM_CONTEXT) --namespace $(NAMESPACE) $(APP_HELM_IMAGE_ARGS) --set monitoring.serviceMonitor.interval=$(SCRAPE_INTERVAL) --timeout 5m
+	$(APP_HELM_UPGRADE)
 
 deploy: deploy-app ## Deploy infrastructure first, then the application.
 
 wait-app: deploy-app ## Wait for app migrations and API/UI readiness.
-	$(KUBECTL) wait --namespace $(NAMESPACE) --for=condition=complete job/$(RELEASE)-migrate --timeout=5m
-	$(KUBECTL) rollout status deployment/$(RELEASE) --namespace $(NAMESPACE) --timeout=5m
-	$(KUBECTL) rollout status deployment/$(FRONTEND_SERVICE) --namespace $(NAMESPACE) --timeout=5m
+	$(MAKE) verify-app-release
 
 infra-ready: wait-app ## Wait for infrastructure, deploy the app once, and verify readiness.
 
@@ -339,7 +376,7 @@ uninstall: ## Uninstall app, infrastructure, and monitoring releases but preserv
 	-helm uninstall $(MONITORING_RELEASE) $(HELM_CONTEXT) --namespace $(MONITORING_NAMESPACE)
 	-helm uninstall $(STRIMZI_RELEASE) $(HELM_CONTEXT) --namespace $(INFRA_NAMESPACE)
 
-cluster-delete: ## Delete the complete Minikube profile; requires CONFIRM=delete.
+cluster-delete: require-minikube ## Delete the complete Minikube profile; requires CONFIRM=delete.
 	@test "$(CONFIRM)" = "delete" || { echo "Refusing to delete the cluster. Re-run with CONFIRM=delete"; exit 1; }
 	minikube delete --profile $(PROFILE)
 
