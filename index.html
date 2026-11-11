@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zipp performance reports</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 1440px;
+      padding: 2rem;
+      line-height: 1.5;
+    }
+    a { color: #2f9e7a; }
+    .metadata, .report {
+      border: 1px solid #8491a3;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+    }
+    .dashboard {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #8491a3;
+      border-radius: 12px;
+      margin: 1rem 0 2rem;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      border-bottom: 1px solid #8491a3;
+      padding: .65rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    code { overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+
+  <h1>Zipp performance reports</h1>
+  <p>
+    Version-controlled history of GitHub-triggered Locust runs against the
+    EC2-hosted k3s environment.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Recorded</th><th>Preset</th><th>Run note</th>
+        <th>Commit</th><th>Workflow</th>
+      </tr>
+    </thead>
+    <tbody><tr><td>2026-11-11T10:46:34.551507+00:00</td><td><a href="runs/43005546299-1-e72b2c2/index.html">mixed_redirect_spike_user_200user_5minutes</a></td><td>Verify persistent forwarding, Grafana evidence, and Pages publishing</td><td><code>e72b2c2</code></td><td><a href="https://github.com/monishcse982/zipp/actions/runs/43005546299">Actions</a></td></tr></tbody>
+  </table>
+  
+</body>
+</html>

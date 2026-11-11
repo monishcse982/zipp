@@ -1,0 +1,15 @@
+{
+  "commit_sha": "e72b2c24eee8b4e2ed21e1c4ceb0c7257bf87604",
+  "environment": "ec2-k3s",
+  "grafana_capture_outcome": "success",
+  "github_run_attempt": "1",
+  "github_run_id": "43005546299",
+  "github_run_url": "https://github.com/monishcse982/zipp/actions/runs/43005546299",
+  "preset": "mixed_redirect_spike_user_200user_5minutes",
+  "recorded_at_utc": "2026-11-11T10:46:34.551507+00:00",
+  "run_key": "43005546299-1-e72b2c2",
+  "run_note": "Verify persistent forwarding, Grafana evidence, and Pages publishing",
+  "runner_name": "githb-runner",
+  "test_ended_at_utc": "2026-11-11T10:45:46.307000+00:00",
+  "test_started_at_utc": "2026-11-11T10:40:43.957000+00:00"
+}

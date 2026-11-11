@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zipp load test: mixed_redirect_spike_user_200user_5minutes</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 1440px;
+      padding: 2rem;
+      line-height: 1.5;
+    }
+    a { color: #2f9e7a; }
+    .metadata, .report {
+      border: 1px solid #8491a3;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+    }
+    .dashboard {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #8491a3;
+      border-radius: 12px;
+      margin: 1rem 0 2rem;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      border-bottom: 1px solid #8491a3;
+      padding: .65rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    code { overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+
+  <p><a href="../../index.html">&larr; All load-test runs</a></p>
+  <h1>Zipp load test: mixed_redirect_spike_user_200user_5minutes</h1>
+  <section class="metadata">
+    <p><strong>Run note:</strong> Verify persistent forwarding, Grafana evidence, and Pages publishing</p>
+    <p><strong>Environment:</strong> <code>ec2-k3s</code></p>
+    <p>
+      <strong>Started:</strong>
+      2026-11-11T10:40:43.957000+00:00
+    </p>
+    <p>
+      <strong>Finished:</strong>
+      2026-11-11T10:45:46.307000+00:00
+    </p>
+    <p><strong>Commit:</strong> <code>e72b2c24eee8b4e2ed21e1c4ceb0c7257bf87604</code></p>
+    <p><a href="https://github.com/monishcse982/zipp/actions/runs/43005546299">GitHub Actions run</a></p>
+  </section>
+  <section class="report">
+    <h2>Locust report</h2>
+    <p><a href="report.html">Open the native Locust HTML report</a></p>
+  </section>
+  <h2>Application metrics</h2>
+  <a href="grafana-application.png">
+    <img class="dashboard" src="grafana-application.png"
+         alt="Grafana application dashboard">
+  </a>
+  <h2>Infrastructure metrics</h2>
+  <a href="grafana-infrastructure.png">
+    <img class="dashboard" src="grafana-infrastructure.png"
+         alt="Grafana infrastructure dashboard">
+  </a>
+  
+</body>
+</html>
