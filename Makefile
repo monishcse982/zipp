@@ -56,7 +56,7 @@ PROMETHEUS_PORT ?= 9090
 PORT_FORWARD_FRONTEND ?= 1
 APP_HELM_IMAGE_ARGS = --set-string image.repository=$(IMAGE) --set-string image.tag=$(IMAGE_TAG) --set-string image.pullPolicy=$(IMAGE_PULL_POLICY) --set-string frontend.image.repository=$(FRONTEND_IMAGE) --set-string frontend.image.tag=$(FRONTEND_IMAGE_TAG) --set-string frontend.image.pullPolicy=$(FRONTEND_IMAGE_PULL_POLICY)
 
-.PHONY: help unit-test coverage app-up app-start app-redeploy ec2-up frontend-deps frontend-env-check infra-up infra-start infra-stop infra-status cluster-up cluster-stop cluster-status image-build image-load validate-env namespace infra-namespace secret postgres-secret valkey-secret kafka-operator monitoring-install monitoring-status grafana-password postgres-password valkey-password kafka-password prometheus-password grafana-forward prometheus-forward chart-deps chart-validate deploy deploy-infra deploy-app wait-infra wait-app sync-kafka-password infra-ready migration-status status logs port-forward port-forward-app port-forward-all diagnose-port-forward restart uninstall cluster-delete makemigrations migrate
+.PHONY: help unit-test coverage app-up app-start app-redeploy ec2-up frontend-deps frontend-env-check infra-up infra-start infra-stop infra-status cluster-up cluster-stop cluster-status image-build image-load validate-env namespace infra-namespace secret postgres-secret valkey-secret kafka-operator monitoring-install monitoring-status grafana-password postgres-password valkey-password kafka-password prometheus-password grafana-forward prometheus-forward chart-deps chart-validate deploy deploy-infra deploy-app wait-infra wait-app sync-kafka-password infra-ready migration-status status logs port-forward ec2-deploy-app deploy-app-release port-forward-app port-forward-all diagnose-port-forward restart uninstall cluster-delete makemigrations migrate
 
 help: ## Show the available commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target> [VARIABLE=value]\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -101,6 +101,43 @@ ec2-up: ## Deploy the complete K3s stack from immutable GHCR images.
 		FRONTEND_IMAGE=$(GHCR_NAMESPACE)/zipp-ui \
 		FRONTEND_IMAGE_TAG=$(IMAGE_TAG) \
 		FRONTEND_IMAGE_PULL_POLICY=IfNotPresent
+
+ec2-deploy-app: ## Deploy only the API and UI from immutable GHCR images to EC2.
+	@if [[ ! "$(IMAGE_TAG)" =~ ^[0-9a-f]{40}$$ ]]; then \
+		echo "IMAGE_TAG must be the full 40-character Git commit SHA"; \
+		exit 1; \
+	fi
+	$(MAKE) deploy-app-release \
+		PROFILE=$(EC2_PROFILE) \
+		IMAGE=$(GHCR_NAMESPACE)/zipp-api \
+		IMAGE_TAG=$(IMAGE_TAG) \
+		IMAGE_PULL_POLICY=IfNotPresent \
+		FRONTEND_IMAGE=$(GHCR_NAMESPACE)/zipp-ui \
+		FRONTEND_IMAGE_TAG=$(IMAGE_TAG) \
+		FRONTEND_IMAGE_PULL_POLICY=IfNotPresent
+
+deploy-app-release: ## Upgrade only the existing application release and verify its rollout.
+	$(KUBECTL) get namespace $(NAMESPACE) >/dev/null
+	$(KUBECTL) get secret zipp-env --namespace $(NAMESPACE) >/dev/null
+	helm upgrade --install $(RELEASE) $(APP_CHART) \
+		$(HELM_CONTEXT) \
+		--namespace $(NAMESPACE) \
+		$(APP_HELM_IMAGE_ARGS) \
+		--set monitoring.serviceMonitor.interval=$(SCRAPE_INTERVAL) \
+		--timeout 5m
+	$(KUBECTL) wait \
+		--namespace $(NAMESPACE) \
+		--for=condition=complete \
+		job/$(RELEASE)-migrate \
+		--timeout=5m
+	$(KUBECTL) rollout status \
+		deployment/$(RELEASE) \
+		--namespace $(NAMESPACE) \
+		--timeout=5m
+	$(KUBECTL) rollout status \
+		deployment/$(FRONTEND_SERVICE) \
+		--namespace $(NAMESPACE) \
+		--timeout=5m
 
 frontend-deps: ## Install locked frontend dependencies if they are missing.
 	@test -d frontend/node_modules || npm --prefix frontend ci
