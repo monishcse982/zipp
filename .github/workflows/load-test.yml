@@ -208,8 +208,8 @@ jobs:
             --data-urlencode "from=$capture_from" \
             --data-urlencode "to=$capture_to" \
             --data-urlencode "tz=UTC" \
-            --data-urlencode "width=1600" \
-            --data-urlencode "height=2200" \
+            --data-urlencode "width=2000" \
+            --data-urlencode "height=1300" \
             --data-urlencode "kiosk" \
             --output "$RUN_DIR/grafana-application.png"
 
@@ -221,8 +221,8 @@ jobs:
             --data-urlencode "from=$capture_from" \
             --data-urlencode "to=$capture_to" \
             --data-urlencode "tz=UTC" \
-            --data-urlencode "width=1600" \
-            --data-urlencode "height=1800" \
+            --data-urlencode "width=2000" \
+            --data-urlencode "height=1200" \
             --data-urlencode "kiosk" \
             --output "$RUN_DIR/grafana-infrastructure.png"
 
