@@ -170,9 +170,11 @@ jobs:
             exit "${load_exit_code:-1}"
           fi
 
-          echo "run_dir=$run_dir" >> "$GITHUB_OUTPUT"
-          echo "test_started_at_ms=$test_started_at_ms" >> "$GITHUB_OUTPUT"
-          echo "test_ended_at_ms=$test_ended_at_ms" >> "$GITHUB_OUTPUT"
+          {
+            echo "run_dir=$run_dir"
+            echo "test_started_at_ms=$test_started_at_ms"
+            echo "test_ended_at_ms=$test_ended_at_ms"
+          } >> "$GITHUB_OUTPUT"
           exit "$load_exit_code"
 
       - name: Capture Grafana dashboards
@@ -354,9 +356,11 @@ jobs:
 
           run_key="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${GITHUB_SHA::7}"
           artifact_name="pages-bundle-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
-          echo "ready=true" >> "$GITHUB_OUTPUT"
-          echo "run_key=$run_key" >> "$GITHUB_OUTPUT"
+          {
+            echo "artifact_name=$artifact_name"
+            echo "ready=true"
+            echo "run_key=$run_key"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Upload Locust report
         if: >-
