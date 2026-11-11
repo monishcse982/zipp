@@ -18,6 +18,9 @@ valkey_port=${PORT_FORWARD_VALKEY_LOCAL_PORT:-6380}
 grafana_port=${PORT_FORWARD_GRAFANA_LOCAL_PORT:-3000}
 prometheus_port=${PORT_FORWARD_PROMETHEUS_LOCAL_PORT:-9090}
 frontend_port=${PORT_FORWARD_FRONTEND_LOCAL_PORT:-5173}
+require_all=${PORT_FORWARD_REQUIRE_ALL:-0}
+healthcheck=${PORT_FORWARD_HEALTHCHECK:-0}
+healthcheck_interval=${PORT_FORWARD_HEALTHCHECK_INTERVAL:-5}
 
 pids=()
 labels=()
@@ -44,6 +47,8 @@ start_forward() {
   local local_port=$4
   local remote_port=$5
   local required=$6
+
+  if [[ $require_all == 1 ]]; then required=1; fi
 
   if ! kubectl --context "$context" get service "$service" --namespace "$ns" >/dev/null 2>&1; then
     echo "Missing Kubernetes Service: $service (namespace: $ns, context: $context)" >&2
@@ -85,6 +90,25 @@ if [[ ${PORT_FORWARD_FRONTEND:-0} == 1 ]]; then
 fi
 echo "Press Ctrl+C to stop the local forwards."
 
+check_forward_health() {
+  if ! curl --fail --silent --show-error --max-time 5 \
+    "http://127.0.0.1:$app_port/health/live" >/dev/null; then
+    echo "Application port-forward health check failed." >&2
+    return 1
+  fi
+
+  if [[ ${PORT_FORWARD_CORE_ONLY:-0} != 1 ]] && \
+    ! curl --fail --silent --show-error --max-time 5 \
+      "http://127.0.0.1:$grafana_port/api/health" >/dev/null; then
+    echo "Grafana port-forward health check failed." >&2
+    return 1
+  fi
+}
+
+if [[ $healthcheck == 1 ]]; then
+  sleep 2
+fi
+
 while true; do
   for index in "${!pids[@]}"; do
     pid=${pids[$index]}
@@ -101,5 +125,10 @@ while true; do
       echo "The API and UI forwards remain active." >&2
     fi
   done
-  sleep 1
+  if [[ $healthcheck == 1 ]]; then
+    check_forward_health || exit 1
+    sleep "$healthcheck_interval"
+  else
+    sleep 1
+  fi
 done

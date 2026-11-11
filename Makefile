@@ -87,6 +87,7 @@ EC2_APP_OVERRIDES = \
 	help unit-test coverage \
 	app-up app-start app-redeploy \
 	ec2-up ec2-deploy-app validate-image-tag deploy-app-release verify-app-release \
+	ec2-forward-install ec2-forward-restart ec2-forward-status ec2-forward-logs \
 	frontend-deps frontend-env-check \
 	infra-up infra-start infra-stop infra-status \
 	cluster-up cluster-stop cluster-status require-minikube cluster-delete \
@@ -142,6 +143,19 @@ ec2-up: validate-image-tag ## Deploy the complete K3s stack from immutable GHCR 
 		CLUSTER_RUNTIME=external \
 		PROMETHEUS_STORAGE_CLASS=local-path \
 		$(EC2_APP_OVERRIDES)
+	$(MAKE) ec2-forward-install
+
+ec2-forward-install: ## Install and start persistent localhost port-forwards on EC2.
+	sudo ./scripts/install-ec2-port-forward-service.sh
+
+ec2-forward-restart: ## Restart the persistent EC2 port-forward service.
+	sudo systemctl restart zipp-port-forwards.service
+
+ec2-forward-status: ## Show the persistent EC2 port-forward service status.
+	sudo systemctl status zipp-port-forwards.service
+
+ec2-forward-logs: ## Follow persistent EC2 port-forward service logs.
+	sudo journalctl --unit zipp-port-forwards.service --follow
 
 ec2-deploy-app: validate-image-tag ## Deploy only the API and UI from immutable GHCR images to EC2.
 	$(MAKE) deploy-app-release \

@@ -115,11 +115,12 @@ rollouts, migration job, and Prometheus PVC and endpoint. The script requires
 passwordless `sudo` for `k3s ctr images import`.
 
 K3s itself, `kube-system`, and `chaos-mesh` stay installed. Stop active tests
-before resetting. After a successful run, restart the EC2 port-forwards and
-the Mac SSH tunnel if needed:
+before resetting. The systemd-managed EC2 forwards reconnect automatically as
+the Services become ready. Confirm them and recreate the Mac SSH tunnel if
+needed:
 
 ```bash
-make port-forward-all PROFILE=default
+make ec2-forward-status
 ```
 
 ### 4. Install Chaos Mesh

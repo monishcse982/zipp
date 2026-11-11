@@ -86,10 +86,22 @@ jobs:
           echo "Environment: ${LOAD_TEST_ENVIRONMENT:-not-set}"
           echo "Target: $base_url"
 
-          curl --fail --silent --show-error --max-time 10 \
+          curl --fail --silent --show-error \
+            --retry 12 \
+            --retry-delay 5 \
+            --retry-connrefused \
+            --retry-all-errors \
+            --retry-max-time 60 \
+            --max-time 10 \
             "$base_url/health/live" \
             --output "$RUNNER_TEMP/zipp-live.json"
-          curl --fail --silent --show-error --max-time 10 \
+          curl --fail --silent --show-error \
+            --retry 12 \
+            --retry-delay 5 \
+            --retry-connrefused \
+            --retry-all-errors \
+            --retry-max-time 60 \
+            --max-time 10 \
             "$base_url/health/ready" \
             --output "$RUNNER_TEMP/zipp-ready.json"
 
@@ -110,7 +122,13 @@ jobs:
           fi
 
           grafana_url="${GRAFANA_BASE_URL%/}"
-          curl --fail --silent --show-error --max-time 10 \
+          curl --fail --silent --show-error \
+            --retry 12 \
+            --retry-delay 5 \
+            --retry-connrefused \
+            --retry-all-errors \
+            --retry-max-time 60 \
+            --max-time 10 \
             "$grafana_url/api/health" \
             --output "$RUNNER_TEMP/grafana-health.json"
           python3 -m json.tool "$RUNNER_TEMP/grafana-health.json"

@@ -1,0 +1,24 @@
+[Unit]
+Description=Zipp Kubernetes localhost port-forwards
+Requires=k3s.service
+After=k3s.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Environment=HOME=/root
+Environment=KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+Environment=PORT_FORWARD_CONTEXT=default
+Environment=PORT_FORWARD_APP_LOCAL_PORT=8080
+Environment=PORT_FORWARD_FRONTEND=1
+Environment=PORT_FORWARD_REQUIRE_ALL=1
+Environment=PORT_FORWARD_HEALTHCHECK=1
+Environment=PORT_FORWARD_HEALTHCHECK_INTERVAL=5
+ExecStart=/usr/local/bin/zipp-port-forward-all
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
