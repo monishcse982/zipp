@@ -1,32 +1,22 @@
-# Zipp Project Status and Roadmap
+# Zipp Roadmap
 
-## Current status
+Zipp runs on a single EC2-hosted K3s cluster with a self-hosted GitHub Actions runner. Version-controlled Locust workloads produce reports and Grafana evidence through GitHub Pages. The load generator shares resources with the application, so current results are useful for feasibility and comparisons, not isolated capacity measurements.
 
-The planned application scope is complete. The project runs locally on Minikube and includes the API, management UI, Cognito authentication, visit-event processing, observability, and repeatable API load tests. The next infrastructure learning exercise is to recreate the stack on a single EC2-hosted K3s cluster and run scoped Chaos Mesh experiments. This does not change the completed application scope.
+## Next improvements
 
-## Completed capabilities
+- **Validate the test path:** compare identical profiles through port-forward and a private direct cluster path, with measured runner and target resource headroom.
+- **Separate the generator:** run Locust from another small EC2 instance, then repeat each preset at least three times to quantify variance. Keep the target, data setup, and environment comparable.
+- **Pipeline evidence:** instrument successful event-to-persistence delay, expose and verify committed consumer lag, and reconcile event delivery separately so a fast percentile does not hide missing events.
+- **Litmus chaos experiments:** run bounded hypotheses under a known background load; record steady state, namespace scope, abort conditions, observed impact, and recovery. See [chaos experiment proposals](chaos-experiments.md).
+- **Application on EKS:** examine how managed Kubernetes changes deployment, node scaling, and operational overhead compared with single-node K3s; document cost and teardown.
+- **Scalable load runner on EKS:** investigate independent distributed load generation and worker scaling after a separate generator baseline exists.
 
-- [x] Create, list, edit, and disable owner-managed short links.
-- [x] Authenticate the management UI and API with Amazon Cognito.
-- [x] Support public, password-protected, and IP-restricted links.
-- [x] Enforce expiry and visit limits, including atomic admission for limited links.
-- [x] Cache eligible public redirects in Redis and invalidate changed links.
-- [x] Publish visit events to Kafka and persist visit details asynchronously in PostgreSQL.
-- [x] Expose application and Kafka metrics, with Prometheus/Grafana dashboards.
-- [x] Run the application stack locally through Minikube and Helm.
-- [x] Exercise API behavior with unit tests and repeatable Locust load profiles.
-- [x] Run GitHub Actions checks for frontend, Python, Helm, image builds, and secret scanning.
+## Known limitations and risks
 
-## Deferred learning work
+- Define measurable latency, throughput, and error-rate objectives before evaluating results.
+- Add browser end-to-end tests for authenticated UI journeys.
+- Cache operations are not best-effort; Valkey failures can affect availability.
+- The visit consumer runs in the API process. Persistence does not deduplicate by event ID, and delivery during failures is not guaranteed.
+- Validate IP-restricted redirects behind a trusted reverse proxy before using them in a proxied deployment.
 
-These are optional follow-up exercises, not unfinished project requirements:
-
-- Recreate the stack on a disposable EC2-hosted K3s cluster, install Chaos Mesh, and run bounded failure experiments. See [the EC2 and Chaos Mesh plan](ec2-chaos-mesh-plan.md).
-- Add browser end-to-end tests for real UI journeys. Current frontend tests cover UI behavior with mocked authentication and API responses; API load testing is already covered by Locust.
-- Improve behavior when Redis is unavailable. Redis is currently checked during application startup and cache operations are not treated as best-effort.
-- Study durable Kafka publishing and idempotent visit processing. Visit-limit admission is committed to PostgreSQL before the visit event is delivered, and visit rows do not currently deduplicate by event ID.
-- Validate IP-restricted links behind a trusted reverse proxy before using that feature in a proxied deployment.
-
-## Completion note
-
-The current local project scope is complete. The EC2/K3s and Chaos Mesh work is a planned learning track; it is not required to finish or operate the local application. The other deferred items remain optional.
+The earlier [EC2 and Chaos Mesh plan](ec2-chaos-mesh-plan.md) records the previous exploration; Litmus is the next planned chaos-testing direction.

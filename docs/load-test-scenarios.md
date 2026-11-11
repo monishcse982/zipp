@@ -1,17 +1,18 @@
 # Zipp Load-Test Scenarios
 
-This document defines the load and resilience scenarios for Zipp. It describes
-test intent, traffic shape, expected outcomes, and evidence to collect. It does
-not prescribe a test implementation.
+This document lists implemented workloads and ideas for future load and
+resilience experiments. Sections below describe test intent and evidence;
+unless stated otherwise they are proposals, not a claim of existing coverage.
+See the [README](../README.md#test-design) for runnable presets.
 
 ## Existing scenarios
 
 The repository already covers:
 
-- Link creation across supported policy types
-- Public redirect traffic
-- Create, visit, and visit-limit/expiry workflows
-- Ramp, constant, spike, step, and constant-rate load shapes
+- Mixed public, password-protected, IP-restricted, and visit-limited redirects
+- Authenticated link management with a read-heavy operation mix
+- Write-heavy link creation across policy and TTL variants
+- Constant, spike, step, ramp with spikes, burst/recovery, and soak presets
 
 ## Core performance scenarios
 
@@ -42,14 +43,16 @@ This is the primary baseline scenario.
 
 **Purpose:** Represent a realistic redirect workload.
 
-Suggested distribution:
+Implemented task selection weights:
 
 - 70% public links
 - 15% password-protected links
 - 10% IP-restricted links
-- 5% visit-limited or expiring links
+- 5% visit-limited links
 
-Track `302`, `401`, `403`, `404`, and `410` responses separately.
+Each selected visit expects `302`. Weights are probabilities, not measured
+request shares. Explicit `401`, `403`, `404`, `410`, and expiry workloads are
+separate proposed coverage.
 
 ### 4. Authenticated link creation
 
