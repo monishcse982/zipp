@@ -1,0 +1,57 @@
+name: Deploy application to EC2
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Full 40-character GHCR image SHA; empty deploys the current master SHA
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ec2-application-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy application to EC2
+    if: ${{ github.ref == 'refs/heads/master' }}
+    runs-on: [self-hosted, linux, x64, zipp-ec2]
+    timeout-minutes: 15
+    environment: EC2
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve immutable image tag
+        id: image
+        env:
+          REQUESTED_IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          image_tag="${REQUESTED_IMAGE_TAG:-$GITHUB_SHA}"
+          if [[ ! "$image_tag" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "image_tag must be a full 40-character Git commit SHA" >&2
+            exit 1
+          fi
+          echo "tag=$image_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy published images
+        env:
+          IMAGE_TAG: ${{ steps.image.outputs.tag }}
+        run: make ec2-deploy-app IMAGE_TAG="$IMAGE_TAG"
+
+      - name: Write deployment summary
+        env:
+          IMAGE_TAG: ${{ steps.image.outputs.tag }}
+        run: |
+          {
+            echo "## Manual EC2 application deployment"
+            echo
+            echo "- API: \`ghcr.io/${GITHUB_REPOSITORY_OWNER}/zipp-api:$IMAGE_TAG\`"
+            echo "- UI: \`ghcr.io/${GITHUB_REPOSITORY_OWNER}/zipp-ui:$IMAGE_TAG\`"
+          } >> "$GITHUB_STEP_SUMMARY"

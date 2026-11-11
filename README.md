@@ -599,6 +599,29 @@ that namespace object. It cannot change resources in `zipp-infra` or
 `zipp-observability`. Keep its kubeconfig outside the repository at
 `/home/github-runner/.kube/config`.
 
+### Manual EC2 application deployment
+
+The `Deploy application to EC2` workflow provides an explicit recovery and
+rollback path. Run it without an input to deploy the images tagged with the
+current `master` commit:
+
+```bash
+gh workflow run deploy-ec2.yml --ref master
+```
+
+Deploy a previously published API and UI image pair by supplying its full Git
+SHA:
+
+```bash
+gh workflow run deploy-ec2.yml \
+  --ref master \
+  -f image_tag='<full-40-character-git-sha>'
+```
+
+The automatic and manual deployment jobs share one concurrency group, so they
+cannot modify the Helm release at the same time. The workflow accepts only
+immutable full-SHA image tags and only deploys from `master`.
+
 Run Ruff checks:
 
 ```bash

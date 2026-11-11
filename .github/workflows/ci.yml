@@ -215,6 +215,9 @@ jobs:
     runs-on: [self-hosted, linux, x64, zipp-ec2]
     timeout-minutes: 15
     environment: EC2
+    concurrency:
+      group: ec2-application-deployment
+      cancel-in-progress: false
     permissions:
       contents: read
     steps:
