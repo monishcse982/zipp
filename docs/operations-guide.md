@@ -463,57 +463,6 @@ kubectl --context minikube wait \
 
 The Kubernetes resource names use hyphens, while the Kafka topic names are `link.visited` and `link.visited.dlq`.
 
-## Load Tests
-
-The scenarios default to `http://localhost:8080`, matching `APP_PORT` and the
-local application port-forward. For Minikube, keep `make port-forward-all`
-running before starting a test. EC2 uses the persistent
-`zipp-port-forwards.service` described below. Use `--base-url` to override the
-target when needed.
-
-List presets:
-
-```bash
-./tests/load/run-load-test.sh --list
-```
-
-Run a preset:
-
-```bash
-export COGNITO_CLIENT_ID='<Cognito app client ID>'
-export COGNITO_API_USERNAME='<dedicated load-test username>'
-export COGNITO_API_PASSWORD='<dedicated load-test password>'
-./tests/load/run-load-test.sh mixed_redirect_constant_user_100user_5minutes
-```
-
-The script also loads these values from the ignored project `.env` file when it
-exists. Never commit Cognito credentials or generated access tokens.
-
-Every local run writes to:
-
-```text
-reports/load/<preset-name>/<timestamp>/
-```
-
-The directory contains the HTML report, CSV data, Locust log, executed command,
-and a copy of the selected preset.
-
-The **Run load test** GitHub Actions workflow runs any version-controlled preset
-on the EC2 self-hosted runner. It requires the protected `load-test-ec2`
-environment with the Cognito secrets above and these environment variables:
-
-```text
-LOAD_TEST_BASE_URL=http://127.0.0.1:8080
-LOAD_TEST_ENVIRONMENT=ec2-k3s
-GRAFANA_BASE_URL=http://127.0.0.1:3000
-```
-
-After a run, the workflow uploads the complete sanitized evidence as a 90-day
-artifact. It also captures the application and infrastructure Grafana
-dashboards for the exact test window. A separate GitHub-hosted job publishes
-the Locust report, screenshots, metadata, and retained run catalogue to GitHub
-Pages. The publishing job never receives Cognito credentials.
-
 ## Code Quality
 
 Pull requests and pushes run the checks in

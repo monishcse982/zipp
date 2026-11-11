@@ -3,7 +3,7 @@
 This document lists implemented workloads and ideas for future load and
 resilience experiments. Sections below describe test intent and evidence;
 unless stated otherwise they are proposals, not a claim of existing coverage.
-See the [performance testing guide](performance-testing.md) for runnable presets.
+See the [README](../README.md#test-design) for runnable presets.
 
 ## Existing scenarios
 

@@ -29,13 +29,26 @@ Scenarios, load shapes, and presets are separate so each workload can be adjuste
 | Load shapes | [tests/load/patterns](tests/load/patterns) | User arrival, concurrency, spikes, steps, and recovery |
 | Presets | [tests/load/presets](tests/load/presets) | Named, version-controlled scenario and shape parameters |
 
-The mixed redirect scenario authenticates each user, creates four link types, and repeatedly selects visits with weights of 70% public, 15% password-protected, 10% IP-restricted, and 5% visit-limited. Weights express selection probabilities, not guaranteed request totals. Separate scenarios exercise read-heavy link management and write-heavy creation.
+### Scenarios and workload mix
 
-Available presets include a 100-user constant run, 200-user spikes, a 250-user step profile, a ramp with additive spikes, burst and recovery, a 50-user one-hour soak, and management and write-heavy workloads. Preset names encode their intended workload; inspect the preset and its shape for exact timing and user counts.
+| Scenario | Behavior | Example preset |
+| --- | --- | --- |
+| Mixed redirects | Each user authenticates, creates four links, then selects public, password-protected, IP-restricted, and visit-limited visits with weights 70/15/10/5. | `mixed_redirect_spike_user_200user_5minutes` |
+| Management API | Authenticated users primarily list and read links, with some create, update, and disable operations. | `management_api_constant_user_50user_10minutes` |
+| Write-heavy creation | Authenticated users repeatedly create links with different policies, TTLs, and optional titles. | `write_heavy_constant_user_50user_10minutes` |
+
+Task weights are probabilities, not guaranteed request totals. Setup calls, wait time, task durations, failures, and random selection affect the measured mix. A user repeatedly selects tasks until the load shape removes it or the run ends.
+
+Available presets include a 100-user constant run, 200-user spikes, a 250-user step profile, a ramp with additive spikes, burst and recovery, a 50-user one-hour soak, and management and write-heavy workloads. Inspect the preset and its shape for exact timing and user counts. User counts represent concurrent virtual users, not requests per second. In the 250-user ramp preset, each 50-user spike is added to the current baseline; the spike does not necessarily reach 300 users.
 
 ## Run a test from GitHub
 
-The EC2 instance, K3s stack, self-hosted runner, and persistent port-forward service must be running. The `load-test-ec2` GitHub environment supplies the API and Grafana URLs and Cognito credentials. Start the instance manually; the workflow does not manage its lifecycle.
+Start EC2 manually and confirm K3s, the application, Grafana, the `zipp-port-forwards` service, and the `zipp-load` self-hosted runner are available. The workflow does not manage the instance lifecycle. The `load-test-ec2` GitHub environment must contain:
+
+- Variables: `LOAD_TEST_BASE_URL`, `LOAD_TEST_ENVIRONMENT`, and `GRAFANA_BASE_URL`.
+- Secrets: `COGNITO_CLIENT_ID`, `COGNITO_API_USERNAME`, and `COGNITO_API_PASSWORD`.
+
+For the existing EC2 setup, the API and Grafana URLs point to `http://127.0.0.1:8080` and `http://127.0.0.1:3000` respectively.
 
 In **Actions → Run load test → Run workflow**, select a preset and provide a run note. Alternatively:
 
@@ -47,23 +60,32 @@ gh workflow run load-test.yml --ref master \
 gh run watch
 ```
 
-The workflow validates the preset, checks API readiness and Grafana rendering, runs Locust, captures both dashboards for the test window, scans report files for configured credentials and token patterns, and publishes the report history to GitHub Pages. A completed workflow is not by itself a performance acceptance result: review latency, error rates, workload shape, and resource behavior against the goal for that run.
+The workflow validates the preset, checks API liveness and readiness and Grafana rendering, runs Locust, and captures both dashboards for the test window. It scans report files for configured credentials and token patterns, uploads the run as a 90-day Actions artifact, and publishes a sanitized report bundle and history to GitHub Pages. Load tests against this environment are serialized.
 
 ## Run locally
 
-Start the application and its dependencies using the [operations guide](docs/operations-guide.md), and ensure the API is reachable at `http://localhost:8080`. Python and [uv](https://docs.astral.sh/uv/) are required. Configure a dedicated Cognito test user with the following environment variables; the runner also sources the ignored project `.env` file as shell syntax, so quote values containing shell metacharacters.
+Start the application and its dependencies using the [operations guide](docs/operations-guide.md), and ensure the API is reachable at `http://localhost:8080`. For Minikube, keep `make port-forward-all` running; EC2 uses the persistent forwarding service. Python and [uv](https://docs.astral.sh/uv/) are required. Configure a dedicated Cognito test user with the following environment variables; the runner also sources the ignored project `.env` file as shell syntax, so quote values containing shell metacharacters.
 
 ```bash
 export COGNITO_CLIENT_ID='<app-client-id>'
 export COGNITO_API_USERNAME='<test-user>'
 export COGNITO_API_PASSWORD='<test-password>'
 
+./tests/load/run-load-test.sh --help
 ./tests/load/run-load-test.sh --list
 ./tests/load/run-load-test.sh mixed_redirect_constant_user_100user_5minutes \
   --base-url http://localhost:8080
 ```
 
 Local evidence is saved under `reports/load/<preset>/<timestamp>/`: the Locust HTML report, CSV statistics and history, log, executed command, and preset snapshot. Credentials and generated tokens must stay out of source control and shared reports.
+
+## Interpret a run
+
+Before running, record the question, expected behavior, workload, target version, and relevant thresholds. Compare request counts, response codes, failures, throughput, and latency percentiles with application and infrastructure graphs over the same test window. Check pod restarts and dependency health when investigating changes. Record observations and uncertainty alongside links to the report and Actions run.
+
+Locust's **Final ratio** section describes configured task weights and final user-class counts; it is not a count of executed requests. A shape that ends with zero users can display zero for the final class and total ratios. Use request statistics for observed traffic.
+
+The EC2 runner and K3s workloads share a machine, so CPU, memory, network, and port forwarding can affect both generator and target. Treat the results as feasibility and comparative evidence, not isolated capacity measurements. A successful workflow confirms execution and publication; it does not establish a performance pass without explicit thresholds.
 
 ## Deployment and observability
 
@@ -79,7 +101,6 @@ The EC2 port-forward service keeps the API, UI, Grafana, Prometheus, PostgreSQL,
 
 ## Documentation
 
-- [Performance testing guide](docs/performance-testing.md): workloads, execution, evidence, and interpretation.
 - [Load-test scenarios](docs/load-test-scenarios.md): implemented coverage and proposed experiments.
 - [Operations guide](docs/operations-guide.md): local and EC2 setup, deployment, and troubleshooting.
 - [Roadmap](docs/roadmap.md): next improvements and known opportunities.

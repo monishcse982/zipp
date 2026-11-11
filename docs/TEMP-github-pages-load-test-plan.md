@@ -2,7 +2,7 @@
 
 > Historical planning document: checkboxes and proposed details below are not
 > current status. The workflow and report history now exist; see the current
-> [performance testing guide](performance-testing.md) and [roadmap](roadmap.md).
+> [README](../README.md#run-a-test-from-github) and [roadmap](roadmap.md).
 
 > Temporary working document. Remove it or convert the completed sections into
 > permanent documentation after the first successful published run.
