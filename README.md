@@ -77,4 +77,10 @@ The EC2 port-forward service keeps the API, UI, Grafana, Prometheus, PostgreSQL,
 - Host the application on Amazon EKS to explore a managed Kubernetes deployment.
 - Host the load runner on EKS and scale load generation independently of the application.
 
-See the [roadmap](docs/roadmap.md) and [load-test scenario ideas](docs/load-test-scenarios.md) for more detail.
+## Documentation
+
+- [Performance testing guide](docs/performance-testing.md): workloads, execution, evidence, and interpretation.
+- [Load-test scenarios](docs/load-test-scenarios.md): implemented coverage and proposed experiments.
+- [Operations guide](docs/operations-guide.md): local and EC2 setup, deployment, and troubleshooting.
+- [Roadmap](docs/roadmap.md): next improvements and known opportunities.
+- [Cognito API and UI design](docs/cognito-management-ui-plan.md): authentication and management decisions.

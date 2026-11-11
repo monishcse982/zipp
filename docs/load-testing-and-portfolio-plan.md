@@ -1,5 +1,9 @@
 # Zipp Load Testing and Portfolio Plan
 
+> Historical session plan. Several workloads and the GitHub reporting workflow
+> are now implemented. Use the [performance testing guide](performance-testing.md)
+> for current instructions and the [roadmap](roadmap.md) for next steps.
+
 ## Objective
 
 Run repeatable, evidence-based performance tests against Zipp, correlate the

@@ -1,5 +1,9 @@
 # EC2 Kubernetes and Chaos Mesh learning plan
 
+> Historical exploration: EC2/K3s is now in use and this document records the
+> earlier Chaos Mesh approach. See the [operations guide](operations-guide.md)
+> for current setup and the [roadmap](roadmap.md) for the planned Litmus work.
+
 ## Goal
 
 Recreate the Zipp stack on a Linux EC2 instance, then use Chaos Mesh to run small,
@@ -194,5 +198,5 @@ removed or intentionally retained, and the actual session cost is recorded.
 - Add cleanup and validation commands. Do not add automated chaos experiments
   to normal CI; run them only against the disposable cluster.
 
-This document is a plan only. No EC2 instance, K3s cluster, or Chaos Mesh
-installation is created by adding it to the repository.
+This document records the original plan rather than the current state of the
+EC2 host or its installed software.

@@ -1,5 +1,8 @@
 # Cognito management API and UI plan
 
+> Historical design record. For current setup instructions, see the
+> [operations guide](operations-guide.md).
+
 Status: complete for the current local application scope. Cognito sign-in and management are configured. Production-origin changes are deferred until a hosting target is selected.
 
 ## Decisions and contract
